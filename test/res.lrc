@@ -1,0 +1,10 @@
+<RCC>
+    <lresource prefix="/">
+        <file>resfile/spinLeft.png</file>
+        <file>resfile/spinRight.png</file>
+        <file>resfile/comboDown.png</file>
+        <file>resfile/logo.png</file>
+        <file>resfile/style.css</file>
+        <file>resfile/en.json</file>
+    </lresource>
+</RCC>

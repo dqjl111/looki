@@ -1,0 +1,78 @@
+/* ============================================================
+   暗色主题（Dark Theme）
+   通过菜单栏“外观 → 暗色风格”切换；
+   切换时会同时应用暗色调色板，本文件负责文字色与面板底色的细节。
+
+   说明：按钮 / 输入框 / 下拉框不再用 CSS 画背景，
+        交给调色板 + 控件自身的边框绘制，这样才有清晰的边界与圆角。
+   ============================================================ */
+
+LButton {
+    color: #EDEDED;
+}
+
+LButton:hover {
+    color: #FFFFFF;
+}
+
+LLineEdit {
+    color: #EDEDED;
+}
+
+LSpinBox {
+    color: #EDEDED;
+}
+
+LComboEdit {
+    color: #EDEDED;
+}
+
+LComboBox {
+    color: #EDEDED;
+}
+
+LTextEdit {
+    color: #EDEDED;
+}
+
+LLabel {
+    color: #EDEDED;
+}
+
+LGroupBox {
+    color: #DCDCDC;
+}
+
+/* 菜单：面板略亮于窗口，选中项再亮一档 */
+LMenu {
+    color: #EDEDED;
+    background-color: #262626;
+}
+
+LMenuBar {
+    color: #EDEDED;
+    background-color: #262626;
+}
+
+LMenu::item {
+    color: #EDEDED;
+}
+
+LMenu::item:hover {
+    color: #FFFFFF;
+    background-color: #3C3C3C;
+}
+
+/* 标签栏：比窗口略暗，选中项提亮以突出 */
+LTabBar {
+    background-color: #1C1C1C;
+}
+
+LTabBar::item {
+    color: #9E9E9E;
+}
+
+LTabBar::item:active {
+    color: #FFFFFF;
+    background-color: #2E2E2E;
+}

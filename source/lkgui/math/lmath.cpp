@@ -1,0 +1,7 @@
+﻿#include "lmath.h"
+
+LK_NAMESPACE_BEGIN
+
+
+
+LK_NAMESPACE_END
