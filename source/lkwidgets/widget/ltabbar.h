@@ -17,6 +17,9 @@ public:
 
     virtual std::shared_ptr<LAbstractMenu> menu() const override;
     void setCanCloseAction(bool isClosable);
+
+    LSignal<int> sigCurrentChanged;
+
 protected:
     virtual std::shared_ptr<LCombBoxBase> initItem(std::shared_ptr<LComboBoxItem>) override;
     virtual void updateActionRects(const LRect<int> &containerRect) override;

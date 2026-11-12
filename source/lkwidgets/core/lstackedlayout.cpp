@@ -58,13 +58,16 @@ void LStackedLayout::setCurrentIndex(int index)
                 else {
                     // second best: first child widget in the focus chain
                     if (std::shared_ptr<LWidget> i = fw) {
-                        while ((i = i->nextInFocusChain()) != fw) {
+                        std::shared_ptr<LWidget> t = i->nextInFocusChain();
+                        while (t!=fw && t==nullptr) {
+                            i = t;
                             if ((((uint8_t)i->focusPolicy() & (uint8_t)LFocusPolicy::Tab) == (uint8_t)LFocusPolicy::Tab)
                                 && !i->focusProxy() && i->isVisibleTo(nextW) && i->isEnabled()
                                 && nextW->isAncestorOf(i)) {
                                 i->setFocus();
                                 break;
                             }
+                            t = i->nextInFocusChain();
                         }
                         // third best: incoming widget
                         if (i == fw ){

@@ -76,3 +76,22 @@ LTabBar::item:active {
     color: #FFFFFF;
     background-color: #2E2E2E;
 }
+
+/* 列表控件：项的底色与文字，支持悬停与选中态 */
+LListWidget {
+    color: #EDEDED;
+}
+
+LListWidget::item {
+    color: #EDEDED;
+}
+
+LListWidget::item:hover {
+    background-color: #3A3A3A;
+    color: #FFFFFF;
+}
+
+LListWidget::item:selected {
+    background-color: #2F4A66;
+    color: #FFFFFF;
+}

@@ -229,6 +229,14 @@ void LTabBar::popupAction(std::shared_ptr<LActionBase> a, bool activateFirst)
 void LTabBar::currrentItemUpdate()
 {
     update();
+    if(m_currentAction == nullptr){
+        return;
+    }
+
+    const int index = actionIndex(m_currentAction);
+    if(index >= 0){
+        sigCurrentChanged.emt(index);
+    }
 }
 
 void LTabBar::paintEvent(std::shared_ptr<LPaintEvent> e)

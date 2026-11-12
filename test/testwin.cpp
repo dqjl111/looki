@@ -41,6 +41,7 @@
 #include "lkwidgets/widget/lspinbox.h"
 #include "lkwidgets/widget/lgroupbox.h"
 #include "lkwidgets/widget/lstackedwidget.h"
+#include "lkwidgets/widget/llistwidget.h"
 #include "lkwidgets/widget/ltabbar.h"
 #include "lkwidgets/widget/lsplitter.h"
 #include "lkgraph/svg/lsvgrenderer.h"
@@ -53,6 +54,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <set>
 #include <type_traits>
 
 #include <format>
@@ -81,6 +83,8 @@ class LTestMainWindow : public LMainWindow
     std::shared_ptr<LTextEdit> edit;
     std::shared_ptr<LLineEdit> lineEdit;
     std::shared_ptr<LStackedWidget> stack;
+    std::shared_ptr<LStackedWidget> tabStack;
+    std::shared_ptr<LListWidget> listWidget;
     std::shared_ptr<LSound> sound;
     std::shared_ptr<LUdpSocket> udp;
     std::shared_ptr<LTcpServer> server;
@@ -270,10 +274,74 @@ protected:
         //tabBar->setCanCloseAction(true);
         layout->addWidget(tabBar);
 
-        edit = makeInit<LTextEdit>();
-        edit->setName("文本框");
-        edit->viewport()->setName("文本视图");
-        layout->addWidget(edit);
+        // 标签栏对应的页面容器：用 tab 切换页面
+        tabStack = makeInit<LStackedWidget>();
+        tabStack->setName("标签页堆层");
+        tabStack->setMinimumHeight(230);
+
+        // 第1页：文本框（直接作为堆叠页，不再套一层容器）
+        {
+            edit = makeInit<LTextEdit>();
+            edit->setName("文本框");
+            edit->viewport()->setName("文本视图");
+            tabStack->addWidget(edit);
+        }
+
+        // 第2页：LListWidget（列表 / 图标两种模式）
+        {
+            std::shared_ptr<LWidget> page = makeInit<LWidget>();
+            page->setName("标签页2");
+
+            std::shared_ptr<LVBoxLayout> pageLayout = std::make_shared<LVBoxLayout>();
+            pageLayout->setName("标签页2布局");
+            page->setLayout(pageLayout);
+
+            std::shared_ptr<LHBoxLayout> btnRow = std::make_shared<LHBoxLayout>();
+            btnRow->setName("listViewModeRow");
+
+            std::shared_ptr<LButton> listBtn = makeInit<LButton>(L"列表模式");
+            listBtn->setWName(L"列表模式");
+            listBtn->setMinimumHeight(32);
+            listBtn->sigClicked.connect(this, &LTestMainWindow::onListViewMode);
+            btnRow->addWidget(listBtn);
+
+            std::shared_ptr<LButton> iconBtn = makeInit<LButton>(L"图标模式");
+            iconBtn->setWName(L"图标模式");
+            iconBtn->setMinimumHeight(32);
+            iconBtn->sigClicked.connect(this, &LTestMainWindow::onIconViewMode);
+            btnRow->addWidget(iconBtn);
+
+            pageLayout->addItem(btnRow);
+
+            listWidget = makeInit<LListWidget>();
+            listWidget->setName("列表控件");
+            listWidget->setMinimumHeight(150);
+            std::shared_ptr<LTexture> itemIcon = std::make_shared<LTexture>(":/resfile/logo.png");
+            for(int n = 0; n < 24; ++n){
+                listWidget->addItem(std::format(L"列表项 {}", n + 1), itemIcon);
+            }
+            listWidget->setCurrentRow(0);
+            listWidget->setEditable(true);
+            pageLayout->addWidget(listWidget);
+
+            tabStack->addWidget(page);
+        }
+
+        // 第3、4页：占位
+        for(int i=2; i<4; ++i){
+            std::shared_ptr<LLabel> page = makeInit<LLabel>(std::format(L"标签页 {} 内容", i+1));
+            page->setWName(std::format(L"标签页{}", i+1));
+            tabStack->addWidget(page);
+        }
+
+        tabBar->sigCurrentChanged.connect(this, &LTestMainWindow::onTabChanged);
+        layout->addWidget(tabStack);
+        tabStack->setCurrentIndex(0);
+
+        // 堆叠页首帧不会被父控件带到绘制（父重绘会跳过子控件区域），需要显式触发一次
+        if(edit != nullptr){
+            edit->update();
+        }
 
         //std::shared_mutex
         std::shared_ptr<LHBoxLayout> btnLayout = std::make_shared<LHBoxLayout>();
@@ -705,6 +773,37 @@ public:
             // p.setBrush(LBrush::SolidPattern);
             svgRender->render(&p);
             image->save("D:\\test.png");
+        }
+    }
+
+    void onTabChanged(int index)
+    {
+        if(tabStack != nullptr && index >= 0){
+            tabStack->setCurrentIndex(index);
+
+            // 注意：repaintTree 只刷新子控件，页面自身需要单独 update，
+            // 否则滚动区域类页面（如文本框）不会绘制
+            std::shared_ptr<LWidget> page = tabStack->widget(index);
+            if(page != nullptr){
+                page->update();
+                repaintTree(page);
+            }
+
+
+
+
+        }
+    }
+
+    void onListViewMode(bool){
+        if(listWidget != nullptr){
+            listWidget->setViewMode(LListWidget::ListMode);
+        }
+    }
+
+    void onIconViewMode(bool){
+        if(listWidget != nullptr){
+            listWidget->setViewMode(LListWidget::IconMode);
         }
     }
 
