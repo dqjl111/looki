@@ -1,4 +1,5 @@
 #include "lsqldatabase.h"
+#include "lkcore/ldebug.h"
 #include "lkcore/plugin/ldynamiclibrary.h"
 #include "lksql/lsqldriverplugin.h"
 
@@ -26,6 +27,13 @@ void LSqlDatabase::init(const std::string &driverName, uint8_t loadPathFlagss)
 #endif
     if(p != nullptr){
         m_driver = p->create();
+        if(m_driver == nullptr){
+            lWarn() << "Create sql driver failed:" << m_driverName;
+        }
+    }else{
+        // 驱动插件加载失败（DLL 缺失 / 依赖不全 / 位数不匹配等），
+        // 这里给出明确提示，避免上层只看到“打开数据库失败”
+        lWarn() << "Load sql driver plugin failed:" << m_driverName;
     }
 }
 
@@ -69,10 +77,11 @@ const LSqlError &LSqlDatabase::lastError() const
 
 bool LSqlDatabase::open()
 {
-    if(m_driver != nullptr){
-        return m_driver->open(m_dbName, m_userName, m_password, m_hostName, m_port, m_connectionOptions);
+    if(m_driver == nullptr){
+        lWarn() << "Sql driver is not loaded:" << m_driverName << ", db:" << m_dbName;
+        return false;
     }
-    return false;
+    return m_driver->open(m_dbName, m_userName, m_password, m_hostName, m_port, m_connectionOptions);
 }
 
 bool LSqlDatabase::open(const std::string &user, const std::string &password)

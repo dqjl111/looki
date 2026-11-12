@@ -232,6 +232,9 @@ public:
             if (invoker->receiverPointer() == receiver && *itFunc == func) {
                 it = m_objects.erase(it);
                 hasFind = true;
+            }else{
+                // 不匹配时必须前进，否则会原地死循环（此处曾导致界面卡死）
+                ++it;
             }
         }
         return hasFind;
@@ -249,6 +252,8 @@ public:
             if(invoker->receiverPointer() == receiver){
                 it = m_objects.erase(it);
                 hasFind = true;
+            }else{
+                ++it;
             }
         }
 
@@ -273,6 +278,7 @@ public:
             if (invoker->receiverPointer() == receiver && *itFunc == func) {
                 return true;
             }
+            ++it;
         }
         return false;
     }
@@ -289,6 +295,7 @@ public:
             if(invoker->receiverPointer() == receiver){
                 return true;
             }
+            ++it;
         }
         return false;
     }

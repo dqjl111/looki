@@ -19,6 +19,10 @@ LTcpServer::LTcpServer(const uint16_t port, const std::string &ipAddr)
 
 int LTcpServer::listen(int backlog, bool useAsync)
 {
+    // 监听 socket 必须是非阻塞的：poll 报告可读后若连接已被对端关闭，
+    // 阻塞的 accept 会一直等待下去，把界面线程卡死
+    setNonBlocking(true);
+
     int error = ::listen(m_fd, backlog);
     if(error == 0){
         if(useAsync){
@@ -68,6 +72,8 @@ std::shared_ptr<LTcpSocket> LTcpServer::accept(LSockaddr& address, bool useAsync
     FD clientFD = ::accept(m_fd, &address.a, &addrLen);
     if(isValidFD(clientFD)  && isSocketAcceptable(address)){
         std::shared_ptr<LTcpSocket> s= std::make_shared<LTcpSocket>(clientFD);
+        // 连接 socket 同样设为非阻塞，避免 recv/send 阻塞界面线程
+        s->setNonBlocking(true);
         if(useAsync){
             s->connectObjectPoll();
         }
@@ -84,8 +90,13 @@ bool LTcpServer::isSocketAcceptable(const LSockaddr &address) const
 
 void LTcpServer::runObjectPoll()
 {
-    if(hasPendingConnections()){
-        lWarn() << "hasPendingConnections";
+    // 一次轮询内处理完所有挂起连接：接收者在 sigNewConnection 里 accept，
+    // 若只发一次信号，剩余连接会留在队列里导致每帧重复触发（并伴随日志刷屏）。
+    // 限制迭代次数，避免接收者不 accept 时陷入死循环。
+    for(int i = 0; i < 64; ++i){
+        if(!hasPendingConnections()){
+            break;
+        }
         sigNewConnection.emt();
     }
 }

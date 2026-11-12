@@ -4,6 +4,8 @@
 #include "lkcore/io/li18n.h"
 #include "lksql/lsqlcachedresult.h"
 #include "lksql/lsqlquery.h"
+#include <algorithm>
+#include <filesystem>
 #include <ranges>
 #include <string_view>
 #include <sqlite3.h>
@@ -595,7 +597,20 @@ bool LSqliteDriver::open(const std::string &db,
 
     openMode |= SQLITE_OPEN_NOMUTEX;
 
+#ifdef _WIN32
+    // sqlite3 的路径参数要求 UTF-8，而调用方传入的 std::string 通常是本地编码（如 GBK）。
+    // 仅当路径含非 ASCII 字符时做一次转换：纯 ASCII 下本地编码与 UTF-8 一致，
+    // 也避免影响 ":memory:" 之类的特殊名称。
+    std::string dbNameUtf8 = db;
+    if (std::any_of(db.begin(), db.end(),
+                    [](char c) { return static_cast<unsigned char>(c) > 0x7F; })) {
+        const std::u8string u8 = std::filesystem::path(db).u8string();
+        dbNameUtf8.assign(reinterpret_cast<const char *>(u8.data()), u8.size());
+    }
+    const int res = sqlite3_open_v2(dbNameUtf8.c_str(), &m_access, openMode, useLkVfs ? "LkVFS" : nullptr);
+#else
     const int res = sqlite3_open_v2(db.data(), &m_access, openMode, useLkVfs ? "LkVFS" : nullptr);
+#endif
 
     if (res == SQLITE_OK) {
         sqlite3_busy_timeout(m_access, timeOut);

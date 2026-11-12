@@ -94,6 +94,9 @@ public:
 
     bool setSockOptReuse(bool isReuse = true);
     bool setSockOptNoDelay(bool isNoDelay = true);
+
+    /** 设置阻塞/非阻塞。非阻塞后 recv/send/accept 不会卡住调用线程（返回 would-block） */
+    bool setNonBlocking(bool nonBlocking = true);
     //-1-获取状态失败 0-连接正常 其他-连接可能存在问题或已断开
     int socketError();
 

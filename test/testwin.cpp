@@ -515,11 +515,15 @@ public:
             size_t bytes = udp->bytesAvaliable();
             while(bytes >0){
                 std::vector<char> buf(bytes+1, char(0));
-                if(udp->recvfrom(buf.data(), bytes, ipAddr, port) > 0){
+                const int recvLen = udp->recvfrom(buf.data(), (int)bytes, ipAddr, port);
+                if(recvLen > 0){
                     lWarn() << "Recieve:" << buf.data() << ", from:" << ipAddr << ":" << port;
                     bytes = udp->bytesAvaliable();
                 }else{
-                    lWarn() << "Recieve failed:" << udp->lastError();
+                    // recvLen == 0 且错误码为 0：只是没有数据（对端不可达的伪错误已被过滤）
+                    if (udp->lastError() != 0) {
+                        lWarn() << "Recieve failed:" << udp->lastError();
+                    }
                     break;
                 }
             }
@@ -552,13 +556,26 @@ public:
     void onTcpRead(){
         if(peer != nullptr){
             size_t bytes = peer->bytesAvaliable();
-            while(bytes >0){
-                std::vector<char> buf(bytes+1, char(0));
-                if(peer->recv(buf.data(), bytes) > 0){
+
+            // 限制单次回调内的读取次数，避免底层可读字节数与实际读数不同步时死循环卡住界面
+            int guard = 0;
+            while(bytes > 0 && guard++ < 64){
+                std::vector<char> buf(bytes + 1, char(0));
+                const int n = peer->recv(buf.data(), (int)bytes);
+                if(n > 0){
                     lWarn() << "Recieve:" << buf.data();
                     bytes = peer->bytesAvaliable();
                 }else{
-                    lWarn() << "Recieve failed:" << peer->lastError();
+                    // 非阻塞模式下没有数据属于正常情况，不算错误
+                    const auto err = peer->lastError();
+#ifdef _WIN32
+                    const bool wouldBlock = (err == WSAEWOULDBLOCK);
+#else
+                    const bool wouldBlock = (err == EAGAIN || err == EWOULDBLOCK);
+#endif
+                    if (!wouldBlock && err != 0) {
+                        lWarn() << "Recieve failed:" << err;
+                    }
                     break;
                 }
             }
@@ -567,7 +584,7 @@ public:
 
     void onNewConnection(){
         if(server != nullptr){
-            LSockaddr address;
+            LSockaddr address{};
             peer = server->accept(address);
             if(peer != nullptr){
                 lWarn() << "New tcp connection.";

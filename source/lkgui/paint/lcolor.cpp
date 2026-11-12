@@ -365,7 +365,9 @@ void LColor::toHsv(LHsv &hsv) const
         if (hue < double(0.0)){
             hue += double(360.0);
         }
-        hsv.m_hue = (uint8_t)std::lround(hue * 100);
+        // m_hue 是 uint16_t，用 0~36000 表示 0~360 度；
+        // 这里若强转成 uint8_t 会截断（例如 207.8° 存成 45 → 变成红色）
+        hsv.m_hue = (uint16_t)std::lround(hue * 100);
     }
 
 }

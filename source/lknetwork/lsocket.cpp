@@ -1,5 +1,9 @@
 #include "lsocket.h"
 #include "lkcore/ldebug.h"
+
+#ifdef __GNUC__
+#include <fcntl.h>
+#endif
 LK_NAMESPACE_BEGIN
 
 
@@ -195,6 +199,32 @@ bool LSocket::setSockOptNoDelay(bool isNoDelay)
         lWarn() << "Failed to set SockOptNoDelay:" << isNoDelay;
         return false;
     }
+    return true;
+}
+
+bool LSocket::setNonBlocking(bool nonBlocking)
+{
+    if(!isValidFD()){
+        return false;
+    }
+#ifdef __GNUC__
+    const int flags = ::fcntl(m_fd, F_GETFL, 0);
+    if(flags < 0){
+        lWarn() << "Failed to get socket flags:" << errno;
+        return false;
+    }
+    const int newFlags = nonBlocking ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
+    if(::fcntl(m_fd, F_SETFL, newFlags) < 0){
+        lWarn() << "Failed to set socket non-blocking:" << errno;
+        return false;
+    }
+#else
+    u_long mode = nonBlocking ? 1 : 0;
+    if(::ioctlsocket(m_fd, FIONBIO, &mode) == SOCKET_ERROR){
+        lWarn() << "Failed to set socket non-blocking:" << WSAGetLastError();
+        return false;
+    }
+#endif
     return true;
 }
 

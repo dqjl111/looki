@@ -103,7 +103,9 @@ inline std::string adaptLibraryName(const std::string& libraryName)
 [[nodiscard]] inline void* loadDynamicLibrary(const std::string& libraryName)
 {
 #ifdef _WIN32
-    return reinterpret_cast<void*>(LoadLibraryA(libraryName.c_str()));
+    // 经 filesystem::path 中转后调用宽字符版本：
+    // 窄字符串按本地编码解析，宽字符 API 可正确处理中文等非 ASCII 路径
+    return reinterpret_cast<void*>(LoadLibraryW(std::filesystem::path(libraryName).c_str()));
 #else
     return dlopen(libraryName.c_str(), RTLD_NOW);
 #endif

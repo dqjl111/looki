@@ -265,15 +265,7 @@ void LSlider::paintEvent(std::shared_ptr<LPaintEvent> ev)
             if (!enabled) {
                 fillColor = pal->brush(LPalette::Mid)->m_color;
             } else if (hovered) {
-                // 注意：不要用 LColor::lighter()，它对彩色（如强调蓝）转换有误会变红，
-                // 这里直接与白色混合得到更亮的效果
-                const auto lighten = [](const LColor &c, double k) {
-                    return LColor(uint8_t(c.m_red + (255 - c.m_red) * k),
-                                  uint8_t(c.m_green + (255 - c.m_green) * k),
-                                  uint8_t(c.m_blue + (255 - c.m_blue) * k),
-                                  c.m_alpha);
-                };
-                fillColor = lighten(accent, 0.16);
+                fillColor = accent.lighter(112);
             }
 
             painter.save();
