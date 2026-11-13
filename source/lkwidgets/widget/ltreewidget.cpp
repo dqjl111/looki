@@ -1128,15 +1128,13 @@ void LTreeWidget::editItem(int row, int column)
     m_editColumn = column;
     editor->setText(item->text(column));
 
-    // 单元格内容坐标 -> 视口坐标，编辑框作为视口子控件覆盖该单元格
+    // 单元格内容坐标 -> 视口坐标，编辑框宽度贴合该列，避免盖到相邻列
     const LPoint<int> offset = contentsOffset();
     const int x = columnX(column) - offset.m_x;
     const int y = row * rowHeight() + headerHeight() - offset.m_y;
-    LRect<int> r(x, y, columnWidth(column), rowHeight(), false);
-    r = r.adjusted(-2, -2, 4, 2);
-    if(r.m_height < 22){
-        r.setHeight(22);
-    }
+    const int cellH = rowHeight();
+    const int editH = std::max<int>(22, cellH);
+    LRect<int> r(x, y - (editH - cellH) / 2, columnWidth(column), editH, false);
     editor->setGeometry(r);
     editor->setVisible(true);
     editor->setFocus();

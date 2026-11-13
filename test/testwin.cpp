@@ -43,6 +43,7 @@
 #include "lkwidgets/widget/lstackedwidget.h"
 #include "lkwidgets/widget/llistwidget.h"
 #include "lkwidgets/widget/ltreewidget.h"
+#include "lkwidgets/widget/ltablewidget.h"
 #include "lkwidgets/widget/ltabbar.h"
 #include "lkwidgets/widget/lsplitter.h"
 #include "lkgraph/svg/lsvgrenderer.h"
@@ -87,6 +88,7 @@ class LTestMainWindow : public LMainWindow
     std::shared_ptr<LStackedWidget> tabStack;
     std::shared_ptr<LListWidget> listWidget;
     std::shared_ptr<LTreeWidget> treeWidget;
+    std::shared_ptr<LTableWidget> tableWidget;
     std::shared_ptr<LSound> sound;
     std::shared_ptr<LUdpSocket> udp;
     std::shared_ptr<LTcpServer> server;
@@ -386,10 +388,65 @@ protected:
             tabStack->addWidget(page);
         }
 
-        // 第4页：占位
+        // 第4页：LTableWidget，每个 item 一个单元格，支持相邻合并与可控编辑
         {
-            std::shared_ptr<LLabel> page = makeInit<LLabel>(L"第 4 页 内容");
-            page->setWName(L"标签页4");
+            std::shared_ptr<LWidget> page = makeInit<LWidget>();
+            page->setName("标签页4");
+            std::shared_ptr<LVBoxLayout> pageLayout = std::make_shared<LVBoxLayout>();
+            page->setLayout(pageLayout);
+
+            tableWidget = makeInit<LTableWidget>();
+            tableWidget->setName("表格控件");
+            tableWidget->setMinimumHeight(150);
+            tableWidget->setRowColumnCount(6, 5);
+            tableWidget->setHorizontalHeaderLabels({L"名称", L"类型", L"大小", L"状态", L"备注"});
+            tableWidget->setColumnWidth(0, 130);
+            tableWidget->setColumnWidth(1, 100);
+            tableWidget->setColumnWidth(2, 80);
+            tableWidget->setColumnWidth(3, 90);
+            tableWidget->setColumnWidth(4, 120);
+            // 尺寸策略：名称列按内容自适应，备注列拉伸填满，其余列可拖动表头分隔线调整
+            tableWidget->setColumnResizeMode(0, LTableResizeMode::ResizeToContents);
+            tableWidget->setColumnResizeMode(4, LTableResizeMode::Stretch);
+            // 行级高度：标题行单独加高
+            tableWidget->setRowHeight(0, 34);
+
+            // 相邻单元格合并：第 1 行前两列合并；第 3~4 行的“状态”列纵向合并
+            tableWidget->mergeCells(0, 0, 1, 2);
+            tableWidget->mergeCells(2, 3, 2, 1);
+
+            const std::vector<std::vector<std::wstring>> data = {
+                    {L"项目清单",  L"",          L"",      L"",      L""},
+                    {L"main.cpp",  L"C++ 源文件", L"12 KB", L"已完成", L""},
+                    {L"style.css", L"样式表",    L"3 KB",  L"进行中", L"待评审"},
+                    {L"logo.png",  L"图片",      L"24 KB", L"",      L"待替换"},
+                    {L"README.md", L"Markdown",  L"2 KB",  L"已完成", L""},
+                    {L"合计",      L"",          L"41 KB", L"",      L""}
+            };
+            std::shared_ptr<LTexture> cellIcon =
+                    std::make_shared<LTexture>(":/resfile/logo.png");
+            for(int r = 0; r < (int)data.size(); ++r){
+                for(int c = 0; c < (int)data[r].size(); ++c){
+                    if(tableWidget->isSpanned(r, c)){
+                        continue;
+                    }
+                    // 一个单元格一个 item；名称列的条目带图标
+                    std::shared_ptr<LTexture> icon =
+                            (c == 0 && r >= 1 && r <= 4) ? cellIcon : nullptr;
+                    tableWidget->setItem(r, c,
+                            std::make_shared<LTableWidgetItem>(data[r][c], icon));
+                }
+            }
+
+            // 可编辑性：控件总开关 + 列 + 行 + 单元格
+            tableWidget->setEditable(true);
+            tableWidget->setColumnEditable(4, false);   // 备注列只读
+            tableWidget->setRowEditable(5, false);      // 合计行只读
+            tableWidget->item(1, 2)->setEditable(false); // main.cpp 的“大小”只读
+            tableWidget->sigCellChanged.connect(this, &LTestMainWindow::onTableCellChanged);
+            tableWidget->setCurrentCell(1, 0);
+
+            pageLayout->addWidget(tableWidget);
             tabStack->addWidget(page);
         }
 
@@ -880,6 +937,14 @@ public:
         if(item != nullptr){
             lWarn() << "Tree item changed, column:" << column
                     << " text:" << item->text(column);
+        }
+    }
+
+    void onTableCellChanged(std::shared_ptr<LTableWidgetItem> item, int row, int column)
+    {
+        if(item != nullptr){
+            lWarn() << "Table cell changed:" << row << "," << column
+                    << " text:" << item->text();
         }
     }
 
