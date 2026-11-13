@@ -157,7 +157,7 @@ public:
     uint32_t clipEnabled:1;
 
     LBGMode bgMode = LBGMode::Transparent;
-    LLayoutDirection layoutDirection;
+    LLayoutDirection layoutDirection = LLayoutDirection::Auto;
     LCompositionMode compositionMode = LCompositionMode::SourceOver;
     uint32_t emulationSpecifier = 0;
     uint32_t changeFlags = 0;

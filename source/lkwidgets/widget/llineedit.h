@@ -27,6 +27,9 @@ public:
 protected:
     virtual void paintEvent(std::shared_ptr<LPaintEvent> ev) override;
     virtual LRect<int> editRect() const override;
+
+    /** 聚焦时描边宽度；派生类可重写以得到更细的边框 */
+    virtual int focusFrameWidth() const{ return 2; }
 };
 
 

@@ -119,7 +119,7 @@ void LLineEdit::paintEvent(std::shared_ptr<LPaintEvent> ev)
             const int radius = std::min<int>(pStyle->get(&LStylePixelMetric::controlRadius),
                                              std::min<int>(rect().m_width / 2, rect().m_height / 2));
             p.setBrush(LBrush::NoPattern);
-            p.setPen(pal->brush(LPalette::Highlight)->m_color, LPenStyle::Solid, 2);
+            p.setPen(pal->brush(LPalette::Highlight)->m_color, LPenStyle::Solid, focusFrameWidth());
             p.drawRoundedRect(rect().toRectF().adjusted(1, 1, -1, -1),
                               radius, radius, LSizeMode::Absolute);
             p.restore();

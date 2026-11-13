@@ -318,10 +318,18 @@ protected:
             listWidget->setMinimumHeight(150);
             std::shared_ptr<LTexture> itemIcon = std::make_shared<LTexture>(":/resfile/logo.png");
             for(int n = 0; n < 24; ++n){
-                listWidget->addItem(std::format(L"列表项 {}", n + 1), itemIcon);
+                // 列表项本身就是 action：可携带 userData（如文件路径），
+                // 也能单独连接单击/双击信号，将来做文件浏览器可直接复用
+                std::wstring t = std::format(L"列表项 {}", n + 1);
+                if(n == 2){ t = L"这是一段特别长的列表项文字用来验证超长文本从开头显示"; } // TEMP
+                std::shared_ptr<LListWidgetItem> item = std::make_shared<LListWidgetItem>(
+                        t, itemIcon, LVariant(n + 1));
+                item->sigTrigger.connect(this, &LTestMainWindow::onListItemTrigger);
+                listWidget->addItem(item);
             }
             listWidget->setCurrentRow(0);
             listWidget->setEditable(true);
+            listWidget->setViewMode(LListWidget::IconMode); // TEMP
             pageLayout->addWidget(listWidget);
 
             tabStack->addWidget(page);
@@ -781,6 +789,10 @@ public:
         if(tabStack != nullptr && index >= 0){
             tabStack->setCurrentIndex(index);
 
+
+
+
+
             // 注意：repaintTree 只刷新子控件，页面自身需要单独 update，
             // 否则滚动区域类页面（如文本框）不会绘制
             std::shared_ptr<LWidget> page = tabStack->widget(index);
@@ -792,6 +804,13 @@ public:
 
 
 
+        }
+    }
+
+    void onListItemTrigger(std::shared_ptr<LListWidgetItem> item)
+    {
+        if(item != nullptr){
+            lWarn() << "List item:" << item->text();
         }
     }
 

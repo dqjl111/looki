@@ -11,6 +11,30 @@
 LK_NAMESPACE_BEGIN
 
 // ---------------------------------------------------------------------------
+// LListWidgetItem
+// ---------------------------------------------------------------------------
+LListWidgetItem::LListWidgetItem(const std::wstring &text,
+                                 std::shared_ptr<LTexture> icon,
+                                 const LVariant &userData)
+    : LActionBase(text, icon, userData)
+{
+    m_isListItem = true;
+}
+
+void LListWidgetItem::activate(ActionEvent event)
+{
+    LActionBase::activate(event);
+    if(event == Trigger){
+        sigTrigger.emt(getPtrT<LListWidgetItem>());
+    }
+}
+
+void LListWidgetItem::triggerDoubleClick()
+{
+    sigDoubleClick.emt(getPtrT<LListWidgetItem>());
+}
+
+// ---------------------------------------------------------------------------
 // 就地编辑框：回车提交、Esc 取消、失焦提交
 // ---------------------------------------------------------------------------
 class LListItemEditor : public LLineEdit
@@ -24,7 +48,22 @@ public:
     LSignal<> sigCommit;
     LSignal<> sigCancel;
 
+    /** 把光标移到文本末尾；setText 后光标停在开头，直接输入会插到最前面 */
+    void moveCursorToEnd()
+    {
+        if(m_editor == nullptr){
+            return;
+        }
+        std::shared_ptr<LEditBase> base = m_editor->editBase();
+        if(base != nullptr){
+            base->setActivePos((int)text().size());
+        }
+    }
+
 protected:
+    // 就地编辑框只覆盖一行文字，焦点描边用 1px，避免看起来比列表项厚重
+    int focusFrameWidth() const override { return 1; }
+
     void keyPressEvent(std::shared_ptr<LKeyEvent> e) override
     {
         const uint32_t key = e->key();
@@ -148,15 +187,15 @@ protected:
                 p.drawRoundedRect(r.toRectF().adjusted(2, 2, -2, -2), 4, 4, LSizeMode::Absolute);
             }
 
-            const LListWidgetItemData *data = owner->itemData(i);
+            std::shared_ptr<LListWidgetItem> data = owner->itemData(i);
             if(data != nullptr){
                 const LSize<int> iconSize = owner->iconSize();
                 if(owner->viewMode() == LListWidget::ListMode){
                     double x = r.m_x + 10;
-                    if(data->m_icon != nullptr){
+                    if(data->icon() != nullptr){
                         const double iy = r.m_y + (r.m_height - iconSize.m_y) / 2.0;
                         p.drawPixmap(LPoint<double>(x, iy),
-                                     data->m_icon->getPixmap(iconSize, LTexture::Normal, true));
+                                     data->icon()->getPixmap(iconSize, LTexture::Normal, true));
                         x += iconSize.m_x + 10;
                     }
                     // 选中项刚用 No 画笔填充过背景，这里必须显式指定实心画笔，
@@ -164,24 +203,41 @@ protected:
                     if(!hasForeground){
                         p.setPen(pal->brush(LPalette::Text)->m_color, LPenStyle::Solid, 1);
                     }
-                    const int flags = (int)LTextFlag::Left | (int)LTextFlag::VCenter | (int)LTextFlag::SingleLine;
                     LRect<int> tr = owner->itemTextRect(i, viewWidth);
                     tr.translate(0, -offsetY);
-                    p.drawText(tr.toRectF(), flags, data->m_text);
+                    // 基于坐标点的 drawText 固定文字起点，超出文本区域的部分自行裁剪；
+                    // 段落方向沿用 painter 状态（LPainterState 默认为 Auto），
+                    // LTR 文本不会触发 bidi 重排，无需强制方向
+                    const LFontMetrics fm = fontMetrics();
+                    const double baseline = tr.m_y + (tr.m_height - fm.height()) / 2.0 + fm.ascent();
+                    p.save();
+                    p.setClipRect(tr.toRectF(), LClipOper::Intersect);
+                    p.drawText(LPoint<double>(tr.m_x, baseline), data->text());
+                    p.restore();
                 }else{
                     const double cx = r.m_x + r.m_width / 2.0;
                     const double iy = r.m_y + 10;
-                    if(data->m_icon != nullptr){
+                    if(data->icon() != nullptr){
                         p.drawPixmap(LPoint<double>(cx - iconSize.m_x / 2.0, iy),
-                                     data->m_icon->getPixmap(iconSize, LTexture::Normal, true));
+                                     data->icon()->getPixmap(iconSize, LTexture::Normal, true));
                     }
                     if(!hasForeground){
                         p.setPen(pal->brush(LPalette::Text)->m_color, LPenStyle::Solid, 1);
                     }
-                    const int flags = (int)LTextFlag::HCenter | (int)LTextFlag::VCenter | (int)LTextFlag::SingleLine;
                     LRect<int> tr = owner->itemTextRect(i, viewWidth);
                     tr.translate(0, -offsetY);
-                    p.drawText(tr.toRectF(), flags, data->m_text);
+                    const LFontMetrics fm = fontMetrics();
+                    const double textW = fm.horizontalAdvance(data->text());
+                    const double baseline = tr.m_y + (tr.m_height - fm.height()) / 2.0 + fm.ascent();
+                    // 文本超出单元宽度时不能再居中：起点会落到文本区左侧之外，
+                    // 裁剪后看到的是文本中间一段。此时从左边界开始，尾部由裁剪忽略
+                    const double tx = textW >= tr.m_width
+                            ? tr.m_x
+                            : tr.m_x + (tr.m_width - textW) / 2.0;
+                    p.save();
+                    p.setClipRect(tr.toRectF(), LClipOper::Intersect);
+                    p.drawText(LPoint<double>(tx, baseline), data->text());
+                    p.restore();
                 }
             }
 
@@ -234,6 +290,12 @@ protected:
             owner->setCurrentRow(row);
             owner->sigItemClicked.emt(row);
 
+            std::shared_ptr<LListWidgetItem> item = owner->item(row);
+            if(item != nullptr){
+                // 项本身就是一个 action：单击激活（文件浏览器可在此打开目录/文件）
+                item->activate(LActionBase::Trigger);
+            }
+
             // 自行判定双击：不依赖系统的 MouseButtonDblClick 事件，
             // 避免某些窗口/控件组合下双击消息不派发到视图
             const auto now = std::chrono::steady_clock::now();
@@ -243,6 +305,9 @@ protected:
                 m_lastClickRow = -1;
                 m_lastClickTime = {};
                 owner->sigItemDoubleClicked.emt(row);
+                if(item != nullptr){
+                    item->triggerDoubleClick();
+                }
 
                 // 只有落在文字上才进入编辑，双击图标等其它位置不触发
                 if(owner->isEditable() && owner->itemTextRect(row, width()).contains(pos)){
@@ -304,9 +369,19 @@ LSize<int> LListWidget::sizeHint() const
     return LSize<int>(240, 200);
 }
 
-int LListWidget::addItem(const std::wstring &text, const std::shared_ptr<LTexture> &icon)
+int LListWidget::addItem(const std::wstring &text,
+                         const std::shared_ptr<LTexture> &icon,
+                         const LVariant &userData)
 {
-    m_items.push_back(LListWidgetItemData{text, icon});
+    return addItem(std::make_shared<LListWidgetItem>(text, icon, userData));
+}
+
+int LListWidget::addItem(const std::shared_ptr<LListWidgetItem> &item)
+{
+    if(item == nullptr){
+        return -1;
+    }
+    m_items.push_back(item);
 
     if(std::shared_ptr<LListWidgetView> view = m_view.lock()){
         view->updateScrollBars();
@@ -315,6 +390,29 @@ int LListWidget::addItem(const std::wstring &text, const std::shared_ptr<LTextur
     }
     update();
     return (int)m_items.size() - 1;
+}
+
+std::shared_ptr<LListWidgetItem> LListWidget::item(int row) const
+{
+    if(row < 0 || row >= (int)m_items.size()){
+        return nullptr;
+    }
+    return m_items[row];
+}
+
+std::shared_ptr<LListWidgetItem> LListWidget::currentItem() const
+{
+    return item(m_currentRow);
+}
+
+int LListWidget::rowOf(const std::shared_ptr<LListWidgetItem> &item) const
+{
+    for(int i = 0; i < (int)m_items.size(); ++i){
+        if(m_items[i] == item){
+            return i;
+        }
+    }
+    return -1;
 }
 
 void LListWidget::clear()
@@ -389,7 +487,14 @@ void LListWidget::setCurrentRow(int row)
         return;
     }
     if(m_currentRow != row){
+        // 同步 action 的选中状态，将来样式表/自定义绘制可按 uiState() 区分
+        if(m_currentRow >= 0 && m_currentRow < (int)m_items.size()){
+            m_items[m_currentRow]->setSelected(false);
+        }
         m_currentRow = row;
+        if(row >= 0 && row < (int)m_items.size()){
+            m_items[row]->setSelected(true);
+        }
         if(m_viewport != nullptr){
             m_viewport->update();
         }
@@ -430,7 +535,7 @@ void LListWidget::editItem(int row)
     }
 
     m_editRow = row;
-    editor->setText(m_items[row].m_text);
+    editor->setText(m_items[row]->text());
 
     // 编辑框贴合文字区域（内容坐标 -> 控件坐标，减掉滚动偏移）
     const LPoint<int> offset = contentsOffset();
@@ -446,6 +551,9 @@ void LListWidget::editItem(int row)
     editor->setGeometry(r);
     editor->setVisible(true);
     editor->setFocus();
+    // 光标置于末尾：双击编辑通常是接着已有文本继续输入，
+    // 若停在开头，用户敲空格会变成前导空格，文字看起来整体右移
+    editor->moveCursorToEnd();
     m_viewport->update();
 }
 
@@ -464,8 +572,8 @@ void LListWidget::commitEdit()
 
     if(editor != nullptr && row >= 0 && row < (int)m_items.size()){
         const std::wstring text = editor->text();
-        if(m_items[row].m_text != text){
-            m_items[row].m_text = text;
+        if(m_items[row]->text() != text){
+            m_items[row]->setText(text);
             sigItemTextChanged.emt(row);
         }
     }
@@ -491,8 +599,8 @@ void LListWidget::setItemText(int row, const std::wstring &text)
     if(row < 0 || row >= (int)m_items.size()){
         return;
     }
-    if(m_items[row].m_text != text){
-        m_items[row].m_text = text;
+    if(m_items[row]->text() != text){
+        m_items[row]->setText(text);
         if(m_viewport != nullptr){
             m_viewport->update();
         }
@@ -501,18 +609,13 @@ void LListWidget::setItemText(int row, const std::wstring &text)
 
 std::wstring LListWidget::itemText(int row) const
 {
-    if(row < 0 || row >= (int)m_items.size()){
-        return std::wstring();
-    }
-    return m_items[row].m_text;
+    std::shared_ptr<LListWidgetItem> data = item(row);
+    return data != nullptr ? data->text() : std::wstring();
 }
 
-const LListWidgetItemData *LListWidget::itemData(int row) const
+std::shared_ptr<LListWidgetItem> LListWidget::itemData(int row) const
 {
-    if(row < 0 || row >= (int)m_items.size()){
-        return nullptr;
-    }
-    return &m_items[row];
+    return item(row);
 }
 
 int LListWidget::rowHeight() const
@@ -569,8 +672,8 @@ LRect<int> LListWidget::itemTextRect(int row, int viewWidth) const
     }
 
     const LFontMetrics fm = fontMetrics();
-    const LListWidgetItemData *data = itemData(row);
-    const bool hasIcon = (data != nullptr && data->m_icon != nullptr);
+    std::shared_ptr<LListWidgetItem> data = itemData(row);
+    const bool hasIcon = (data != nullptr && data->icon() != nullptr);
     const int lineHeight = std::max<int>(fm.height(), 12);
 
     if(m_viewMode == ListMode){
