@@ -42,6 +42,7 @@
 #include "lkwidgets/widget/lgroupbox.h"
 #include "lkwidgets/widget/lstackedwidget.h"
 #include "lkwidgets/widget/llistwidget.h"
+#include "lkwidgets/widget/ltreewidget.h"
 #include "lkwidgets/widget/ltabbar.h"
 #include "lkwidgets/widget/lsplitter.h"
 #include "lkgraph/svg/lsvgrenderer.h"
@@ -85,6 +86,7 @@ class LTestMainWindow : public LMainWindow
     std::shared_ptr<LStackedWidget> stack;
     std::shared_ptr<LStackedWidget> tabStack;
     std::shared_ptr<LListWidget> listWidget;
+    std::shared_ptr<LTreeWidget> treeWidget;
     std::shared_ptr<LSound> sound;
     std::shared_ptr<LUdpSocket> udp;
     std::shared_ptr<LTcpServer> server;
@@ -320,25 +322,74 @@ protected:
             for(int n = 0; n < 24; ++n){
                 // 列表项本身就是 action：可携带 userData（如文件路径），
                 // 也能单独连接单击/双击信号，将来做文件浏览器可直接复用
-                std::wstring t = std::format(L"列表项 {}", n + 1);
-                if(n == 2){ t = L"这是一段特别长的列表项文字用来验证超长文本从开头显示"; } // TEMP
                 std::shared_ptr<LListWidgetItem> item = std::make_shared<LListWidgetItem>(
-                        t, itemIcon, LVariant(n + 1));
+                        std::format(L"列表项 {}", n + 1), itemIcon, LVariant(n + 1));
                 item->sigTrigger.connect(this, &LTestMainWindow::onListItemTrigger);
                 listWidget->addItem(item);
             }
             listWidget->setCurrentRow(0);
             listWidget->setEditable(true);
-            listWidget->setViewMode(LListWidget::IconMode); // TEMP
             pageLayout->addWidget(listWidget);
 
             tabStack->addWidget(page);
         }
 
-        // 第3、4页：占位
-        for(int i=2; i<4; ++i){
-            std::shared_ptr<LLabel> page = makeInit<LLabel>(std::format(L"标签页 {} 内容", i+1));
-            page->setWName(std::format(L"标签页{}", i+1));
+        // 第3页：LTreeWidget，分支节点展示层级，叶子结点携带多个属性列
+        {
+            std::shared_ptr<LWidget> page = makeInit<LWidget>();
+            page->setName("标签页3");
+            std::shared_ptr<LVBoxLayout> pageLayout = std::make_shared<LVBoxLayout>();
+            page->setLayout(pageLayout);
+
+            treeWidget = makeInit<LTreeWidget>();
+            treeWidget->setName("树控件");
+            treeWidget->setMinimumHeight(150);
+            treeWidget->setColumnCount(4);
+            treeWidget->setHeaderLabels({L"名称", L"类型", L"大小", L"修改时间"});
+            treeWidget->setColumnWidth(0, 220);
+            treeWidget->setColumnWidth(1, 120);
+            treeWidget->setColumnWidth(2, 90);
+            treeWidget->setColumnWidth(3, 140);
+            // 可编辑性：控件总开关；第 0 列默认只读，这里放开名称列
+            treeWidget->setEditable(true);
+            treeWidget->setColumnEditable(0, true);
+            treeWidget->sigItemClicked.connect(this, &LTestMainWindow::onTreeItemClicked);
+            treeWidget->sigItemTextChanged.connect(this, &LTestMainWindow::onTreeItemTextChanged);
+
+            std::shared_ptr<LTexture> treeIcon = std::make_shared<LTexture>(":/resfile/logo.png");
+            std::shared_ptr<LTreeWidgetItem> root = treeWidget->addTopLevelItem(L"项目文件", treeIcon);
+
+            std::shared_ptr<LTreeWidgetItem> src = std::make_shared<LTreeWidgetItem>(L"src", treeIcon);
+            treeWidget->addChild(root, src);
+            std::shared_ptr<LTreeWidgetItem> mainFile = treeWidget->addLeaf(src,
+                    std::vector<std::wstring>{L"main.cpp", L"C++ 源文件", L"12 KB", L"2026-11-13"});
+            // 单元格级：大小列只读，覆盖列级/行级默认
+            mainFile->setCellEditable(2, false);
+            treeWidget->addLeaf(src, std::vector<std::wstring>{
+                    L"ltreewidget.cpp", L"C++ 源文件", L"28 KB", L"2026-11-13"});
+
+            std::shared_ptr<LTreeWidgetItem> res = std::make_shared<LTreeWidgetItem>(L"res", treeIcon);
+            treeWidget->addChild(root, res);
+            treeWidget->addLeaf(res, std::vector<std::wstring>{
+                    L"style.css", L"样式表", L"3 KB", L"2026-11-10"});
+            treeWidget->addLeaf(root, std::vector<std::wstring>{
+                    L"README.md", L"Markdown", L"2 KB", L"2026-11-12"});
+
+            std::shared_ptr<LTreeWidgetItem> build = treeWidget->addTopLevelItem(L"构建输出", treeIcon);
+            // 行级：该节点整行只读（不继承给子节点）
+            build->setEditable(false);
+            treeWidget->addLeaf(build, std::vector<std::wstring>{
+                    L"lktestwin.exe", L"可执行文件", L"1.4 MB", L"2026-11-13"});
+
+            treeWidget->setCurrentRow(0);
+            pageLayout->addWidget(treeWidget);
+            tabStack->addWidget(page);
+        }
+
+        // 第4页：占位
+        {
+            std::shared_ptr<LLabel> page = makeInit<LLabel>(L"第 4 页 内容");
+            page->setWName(L"标签页4");
             tabStack->addWidget(page);
         }
 
@@ -811,6 +862,24 @@ public:
     {
         if(item != nullptr){
             lWarn() << "List item:" << item->text();
+        }
+    }
+
+    void onTreeItemClicked(int row)
+    {
+        if(treeWidget != nullptr){
+            std::shared_ptr<LTreeWidgetItem> item = treeWidget->itemAtRow(row);
+            if(item != nullptr){
+                lWarn() << "Tree item:" << item->text(0);
+            }
+        }
+    }
+
+    void onTreeItemTextChanged(std::shared_ptr<LTreeWidgetItem> item, int column)
+    {
+        if(item != nullptr){
+            lWarn() << "Tree item changed, column:" << column
+                    << " text:" << item->text(column);
         }
     }
 

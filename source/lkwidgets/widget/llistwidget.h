@@ -32,9 +32,6 @@ public:
     void triggerDoubleClick();
 };
 
-/** 兼容旧名称 */
-using LListWidgetItemData = LListWidgetItem;
-
 /**
  * 列表控件，支持两种显示模式：
  *   ListMode —— 每行一项：图标在左、文字在右，纵向滚动
