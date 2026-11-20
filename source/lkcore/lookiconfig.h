@@ -7,6 +7,14 @@
 #define LOOKI_NAMESPACE 1
 #define LOOKI_BUILD_SHARED 1
 
+/* lkmedia 的视频部分：后端由 CMake 的 looki_VIDEO_BACKEND 选择，
+   源码里只用这些 0/1 宏分流，公共头不含任何平台类型 */
+#define LOOKI_BUILD_VIDEO 1
+#define LOOKI_VIDEO_BACKEND_MF 1
+#define LOOKI_VIDEO_BACKEND_GSTREAMER 0
+#define LOOKI_VIDEO_BACKEND_NULL 0
+#define LOOKI_VIDEO_AUDIO_DUCKING 1
+
 #if LOOKI_NAMESPACE
 #define LK_NAMESPACE_BEGIN namespace lk{
 #define LK_NAMESPACE_END }
@@ -48,10 +56,10 @@
 #   else
 #       define LKSQLDEF L_DECL_IMPORT
 #   endif
-#   if defined(LKBUILD_AUDIO)
-#       define LKAUDIODEF L_DECL_EXPORT
+#   if defined(LKBUILD_MEDIA)
+#       define LKMEDIADEF L_DECL_EXPORT
 #   else
-#       define LKAUDIODEF L_DECL_IMPORT
+#       define LKMEDIADEF L_DECL_IMPORT
 #   endif
 #   if defined(LKBUILD_GUI)
 #       define LKGUIDEF L_DECL_EXPORT
@@ -77,12 +85,17 @@
 #   define LKCOREDEF
 #   define LKNETWORKDEF
 #   define LKSQLDEF
-#   define LKAUDIODEF
+#   define LKMEDIADEF
 #   define LKGUIDEF
 #   define LKWIDGETSDEF
 #   define LKSVGDEF
 #   define LK3DDEF
 #endif
+
+/* lkaudio / lkvideo 已合并为 lkmedia；保留旧宏名作为兼容别名。
+   新代码统一使用 LKMEDIADEF。 */
+#define LKAUDIODEF LKMEDIADEF
+#define LKVIDEODEF LKMEDIADEF
 
 
 #if defined(_MSC_VER)

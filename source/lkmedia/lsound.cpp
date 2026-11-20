@@ -1,6 +1,6 @@
 #include "lsound.h"
 
-#include "lkaudio/laudiodata.h"
+#include "lkmedia/laudiodata.h"
 
 LK_NAMESPACE_BEGIN
 LSound::LSound()

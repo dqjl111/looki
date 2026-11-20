@@ -1,8 +1,9 @@
-﻿#ifndef LRHID3D12_H
-#define LRHID3D12_H
+#ifndef LRhiD3D12_H
+#define LRhiD3D12_H
 #include "lkgui/rhi/lrhiimplementation.h"
 #include "lkgui/rhi/lrhiplatform.h"
 #include "lkgui/lwindow.h"
+#include "lkcore/ldebug.h"
 
 #include <optional>
 #include <array>
@@ -91,10 +92,11 @@ struct LD3D12CpuDescriptorPool
         }
     };
 
-    ID3D12Device *device;
-    uint32_t descriptorByteSize;
+    ID3D12Device *device = nullptr;
+    uint32_t descriptorByteSize = 0;
+    D3D12_DESCRIPTOR_HEAP_TYPE heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     std::vector<HeapWithMap> heaps;
-    const char *debugName;
+    const char *debugName = "";
 };
 
 struct LD3D12QueryHeap
@@ -171,7 +173,7 @@ struct LD3D12ObjectPool
     {
         this->debugName = debugName;
         assert(data.empty());
-        data.append(Data()); // index 0 is always invalid
+        data.push_back(Data()); // index 0 is always invalid
     }
 
     void destroy() {
@@ -183,25 +185,16 @@ struct LD3D12ObjectPool
             }
         }
         data.clear();
-#ifndef QT_NO_DEBUG
-        // debug builds: just do it always
-        static bool leakCheck = true;
-#else
-        // release builds: opt-in
-        static bool leakCheck = qEnvironmentVariableIntValue("QT_RHI_LEAK_CHECK");
-#endif
-        if (leakCheck) {
-            if (leakCount > 0) {
-                qWarning("LD3D12ObjectPool::destroy(): Pool %p '%s' had %d unreleased objects",
-                         this, debugName, leakCount);
-            }
+        if (leakCount > 0) {
+            lWarn() << "rhi/d3d12: object pool" << debugName << "still had"
+                    << leakCount << "unreleased objects";
         }
     }
 
     bool isValid(const LD3D12ObjectHandle &handle) const
     {
         return handle.index > 0
-               && handle.index < uint32_t(data.count())
+               && handle.index < uint32_t(data.size())
                && handle.generation > 0
                && handle.generation == data[handle.index].generation
                && data[handle.index].object.has_value();
@@ -450,6 +443,7 @@ struct LD3D12ShaderVisibleDescriptorHeap
     bool create(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t perFrameDescriptorCount);
     void destroy();
     void destroyWithDeferredRelease(LD3D12ReleaseQueue *releaseQueue);
+    void resetFrame(int frameSlot) { perFrameHeapSlice[frameSlot].head = 0; }
 
     LD3D12DescriptorHeap heap;
     LD3D12DescriptorHeap perFrameHeapSlice[LD3D12_FRAMES_IN_FLIGHT];
@@ -513,6 +507,7 @@ struct LD3D12SamplerManager
     ID3D12Device *device = nullptr;
     LD3D12ShaderVisibleDescriptorHeap shaderVisibleSamplerHeap;
     std::unordered_map<L_D3D12_SAMPLER_DESC, LD3D12Descriptor> gpuMap;
+    int currentFrameSlot = 0;
 };
 
 enum LD3D12Stage { VS = 0, HS, DS, GS, PS, CS };
@@ -780,6 +775,7 @@ struct LD3D12RenderPassDescriptor : public LRhiRenderPassDescriptor
     bool hasDepthStencil = false;
     int colorFormat[MAX_COLOR_ATTACHMENTS];
     int dsFormat;
+    int sampleCount = 1;
     bool hasShadingRateMap = false;
     std::vector<uint32_t> serializedFormatData;
 };
@@ -802,8 +798,10 @@ struct LD3D12RenderTargetData
 
 struct LD3D12SwapChainRenderTarget : public LRhiSwapChainRenderTarget
 {
-    LD3D12SwapChainRenderTarget(std::shared_ptr<LRhiImplementation> rhi, LRhiSwapChain *swapchain);
+    LD3D12SwapChainRenderTarget(std::shared_ptr<LRhiImplementation> rhi,
+                                std::shared_ptr<LRhiSwapChain> swapchain);
     ~LD3D12SwapChainRenderTarget();
+    void setSwapChain(const std::shared_ptr<LRhiSwapChain> &swapchain) { m_swapchain = swapchain; }
     void destroy() override;
 
     LSize<int> pixelSize() const override;
@@ -896,6 +894,11 @@ struct LD3D12ShaderResourceBindings : public LRhiShaderResourceBindings
 
     bool hasDynamicOffset = false;
     uint32_t generation = 0;
+    LD3D12ObjectHandle rootSigHandle;
+    LD3D12Descriptor srvTable[LD3D12_FRAMES_IN_FLIGHT];
+    LD3D12Descriptor samplerTable[LD3D12_FRAMES_IN_FLIGHT];
+    uint32_t srvCount = 0;
+    uint32_t samplerCount = 0;
     LD3D12GraphicsPipeline *lastUsedGraphicsPipeline = nullptr;
     LD3D12ComputePipeline *lastUsedComputePipeline = nullptr;
 
@@ -912,6 +915,7 @@ struct LD3D12GraphicsPipeline : public LRhiGraphicsPipeline
 
     LD3D12ObjectHandle handle;
     LD3D12ObjectHandle rootSigHandle;
+    bool ownsRootSig = true;
     std::array<LD3D12ShaderStageData, 5> stageData;
     D3D12_PRIMITIVE_TOPOLOGY topology;
     UINT viewInstanceMask = 0;
@@ -1053,9 +1057,12 @@ struct LD3D12SwapChain : public LRhiSwapChain
     std::shared_ptr<LRhiRenderPassDescriptor> newCompatibleRenderPassDescriptor() override;
     bool createOrResize() override;
 
+    HWND nativeHwnd() const;
+    bool ensureFrameResources();
     void releaseBuffers();
     void waitCommandCompletionForFrameSlot(int frameSlot);
     void addCommandCompletionSignalForCurrentFrameSlot();
+    void transitionBackBuffer(ID3D12GraphicsCommandList *cmdList, D3D12_RESOURCE_STATES state);
     void chooseFormats();
 
     std::shared_ptr<LWindow> window = nullptr;
@@ -1077,7 +1084,7 @@ struct LD3D12SwapChain : public LRhiSwapChain
     DXGI_SAMPLE_DESC sampleDesc;
     LD3D12ObjectHandle msaaBuffers[BUFFER_COUNT];
     LD3D12Descriptor msaaRtvs[BUFFER_COUNT];
-    LD3D12RenderBuffer *ds = nullptr;
+    std::shared_ptr<LD3D12RenderBuffer> ds = nullptr;
     UINT currentBackBufferIndex = 0;
     LD3D12SwapChainRenderTarget rtWrapper;
     LD3D12SwapChainRenderTarget rtWrapperRight;
@@ -1112,14 +1119,14 @@ public:
 };
 
 
-class LRhiD3d12 : public LRhiImplementation
+class LRhiD3D12 : public LRhiImplementation
 {
 public:
     // gets no space from this will get their own temporary staging areas.
     static const uint32_t SMALL_STAGING_AREA_BYTES_PER_FRAME = 16 * 1024 * 1024;
     static const uint32_t SHADER_VISIBLE_CBV_SRV_UAV_HEAP_PER_FRAME_START_SIZE = 16384;
 
-    LRhiD3d12(std::shared_ptr<LRhiD3D12InitParams> params,
+    LRhiD3D12(std::shared_ptr<LRhiD3D12InitParams> params,
               std::shared_ptr<LRhiD3D12NativeHandles> importDevice = nullptr);
 
     virtual bool create(LFlags<LRhiFlag> flags) override;
@@ -1291,4 +1298,4 @@ public:
 LK_NAMESPACE_END
 
 
-#endif // LRHID3D12_H
+#endif // LRhiD3D12_H

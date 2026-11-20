@@ -7,10 +7,13 @@
 #include "lkgui/image/limage.h"
 #include "lkgui/rhi/lshader.h"
 #include "lkgui/lwindow.h"
+#include "lkgui/math/lmatrix4x4.h"
+#include <list>
 #include <variant>
 
 LK_NAMESPACE_BEGIN
 class LRhiImplementation;
+class LRhiD3D12;
 struct LKGUIDEF LRhiDepthStencilClearValue
 {
     double m_depthClearValue = 1.0;
@@ -83,6 +86,8 @@ public:
     Format m_format = Float4;
     uint32_t m_offset = 0;
     int m_matrixSlice = -1;
+    /** HLSL 语义名（POSITION / TEXCOORD / NORMAL ...）；为空时按 TEXCOORD+location 兜底 */
+    std::string m_name;
 
     friend bool operator==(const LRhiVertexInputAttribute &a, const LRhiVertexInputAttribute &b) noexcept
     {
@@ -147,7 +152,8 @@ public:
     virtual ~LRhiResource();
 
     virtual Type resourceType() const = 0;
-    virtual void destroy() = 0;
+    /** 提前释放底层 GPU 资源；默认无操作，后端可在析构里统一清理 */
+    virtual void destroy() {}
 
 
     inline uint64_t globalResourceId() const{
@@ -538,6 +544,8 @@ private:
     LRhiShaderResourceBinding::Type type;
     std::variant<UniformBufferData,TextureAndOrSamplerData,StorageImageData,StorageBufferData> data;
     friend class LRhiImplementation;
+    // 后端子类要遍历自己的绑定，只能通过下面 bindingInfos() 的快照
+    friend class LRhiShaderResourceBindings;
 };
 
 class LKGUIDEF LRhiShaderResourceBindings : public LRhiResource
@@ -551,10 +559,30 @@ public:
     virtual bool create() = 0;
     virtual void updateResources(bool bindingsAreSorted = false) = 0;
 
+    /** 替换某个采样纹理绑定引用的纹理，布局保持不变时可避免重建 SRB */
+    void setSampledTexture(int binding, std::shared_ptr<LRhiTexture> tex,
+                           std::shared_ptr<LRhiSampler> sampler);
+
     std::vector<LRhiShaderResourceBinding> m_bindings;
+    /** 绑定的只读快照：后端无法直接访问 LRhiShaderResourceBinding 的私有数据 */
+    struct BindingInfo {
+        int binding = 0;
+        int type = 0;               // LRhiShaderResourceBinding::Type
+        int stage = 0;
+        int arraySize = 1;
+        uint32_t offset = 0;
+        int frameLevel = 0;         // 存储映像用的 mip 级别
+        std::shared_ptr<LRhiBuffer> buffer;
+        std::shared_ptr<LRhiSampler> sampler;
+        std::vector<LRhiShaderResourceBinding::TextureAndSampler> textureSamplers;
+    };
+
 protected:
     static constexpr int BINDING_PREALLOC = 12;
     LRhiShaderResourceBindings(std::shared_ptr<LRhiImplementation> rhi);
+
+    /** 供后端子类在 create()/updateResources() 里读取绑定内容 */
+    std::vector<BindingInfo> bindingInfos() const;
 
     size_t m_layoutDescHash = 0;
     std::vector<uint32_t> m_layoutDesc;
@@ -989,6 +1017,8 @@ public:
     virtual LRhiSwapChainHdrInfo hdrInfo();
 
     std::shared_ptr<LWindow> m_window = nullptr;
+    /** 可选：直接使用原生窗口句柄（HWND/NSView 等），用于没有 LWindow 包装的子控件 */
+    void *nativeWindowHandle = nullptr;
     Flags m_flags;
     Format m_format = SDR;
     std::shared_ptr<LRhiRenderBuffer> m_depthStencil = nullptr;
@@ -1122,7 +1152,8 @@ public:
         Null,
         Vulkan,
         Metal,
-        D3D
+        D3D,        // D3D12
+        D3D11
     };
 
     enum FrameOpResult {
@@ -1208,7 +1239,7 @@ public:
     };
 
     static std::shared_ptr<LRhi> create(Implementation impl,
-                                        std::shared_ptr<LRhiInitParams> params,
+                                        std::shared_ptr<LRhiInitParams> params = nullptr,
                                         Flags flags = 0,
                                         std::shared_ptr<LRhiNativeHandles> importDevice  = nullptr,
                                         std::shared_ptr<LRhiAdapter> adapter = nullptr);
@@ -1217,6 +1248,70 @@ public:
     const std::string backendName() const;
     static std::string backendName(Implementation impl);
     LRhiDriverInfo driverInfo() const;
+
+    // ---- 资源工厂：全部转发到当前后端实现 ----
+    std::shared_ptr<LRhiResourceUpdateBatch> newResourceUpdateBatch();
+    std::shared_ptr<LRhiGraphicsPipeline> newGraphicsPipeline();
+    std::shared_ptr<LRhiComputePipeline> newComputePipeline();
+    std::shared_ptr<LRhiShaderResourceBindings> newShaderResourceBindings();
+    std::shared_ptr<LRhiBuffer> newBuffer(LRhiBuffer::Type type,
+                                          LRhiBuffer::UsageFlags usage,
+                                          uint32_t size);
+    std::shared_ptr<LRhiRenderBuffer> newRenderBuffer(LRhiRenderBuffer::Type type,
+                                                      const LSize<int> &pixelSize,
+                                                      int sampleCount,
+                                                      bool usedWithSwapChainOnly = false,
+                                                      LRhiTexture::Format backingFormatHint = LRhiTexture::UnknownFormat);
+    std::shared_ptr<LRhiTexture> newTexture(LRhiTexture::Format format,
+                                           const LSize<int> &pixelSize,
+                                           int depth = 1,
+                                           int arraySize = 1,
+                                           int sampleCount = 1,
+                                           LRhiTexture::Flags flags = {});
+    std::shared_ptr<LRhiSampler> newSampler(LRhiSampler::Filter magFilter,
+                                            LRhiSampler::Filter minFilter,
+                                            LRhiSampler::Filter mipmapMode,
+                                            LRhiSampler::AddressMode u,
+                                            LRhiSampler::AddressMode v,
+                                            LRhiSampler::AddressMode w);
+    std::shared_ptr<LRhiTextureRenderTarget> newTextureRenderTarget(
+            const LRhiTextureRenderTargetDescription &desc,
+            LRhiTextureRenderTarget::Flags flags = {});
+    std::shared_ptr<LRhiShadingRateMap> newShadingRateMap();
+    std::shared_ptr<LRhiSwapChain> newSwapChain();
+
+    // ---- 帧循环 ----
+    FrameOpResult beginFrame(std::shared_ptr<LRhiSwapChain> swapChain,
+                             BeginFrameFlags flags = {});
+    FrameOpResult endFrame(std::shared_ptr<LRhiSwapChain> swapChain,
+                           EndFrameFlags flags = {});
+    FrameOpResult beginOffscreenFrame(std::shared_ptr<LRhiCommandBuffer> *cb,
+                                      BeginFrameFlags flags = {});
+    FrameOpResult endOffscreenFrame(EndFrameFlags flags = {});
+    FrameOpResult finish();
+
+    // ---- 能力查询 ----
+    std::list<int> supportedSampleCounts() const;
+    int ubufAlignment() const;
+    bool isYUpInFramebuffer() const;
+    bool isYUpInNDC() const;
+    bool isClipDepthZeroToOne() const;
+    LMatrix4x4 clipSpaceCorrMatrix() const;
+    bool isTextureFormatSupported(LRhiTexture::Format format,
+                                  LRhiTexture::Flags flags = {}) const;
+    bool isFeatureSupported(Feature feature) const;
+    int resourceLimit(ResourceLimit limit) const;
+    LRhiStats statistics();
+    const std::shared_ptr<LRhiNativeHandles> nativeHandles();
+    const std::shared_ptr<LRhiNativeHandles> nativeHandles(std::shared_ptr<LRhiCommandBuffer> cb);
+    void releaseCachedResources();
+    bool isDeviceLost() const;
+
+    /** 探测某个后端能否在当前环境创建（创建成功即销毁），失败返回 Null */
+    static Implementation probe(Implementation impl,
+                                std::shared_ptr<LRhiInitParams> params = nullptr,
+                                Flags flags = 0);
+
 protected:
     LRhi();
     std::shared_ptr<LRhiImplementation> m_impl;
@@ -1306,6 +1401,10 @@ private:
     int poolIndex = -1;
 
     friend class LRhi;
+    // 后端实现需要遍历 bufferOps / textureOps 才能完成上传与拷贝
+    friend class LRhiImplementation;
+    friend class LRhiD3D12;
+    friend class LRhiD3d11;
 };
 
 LK_NAMESPACE_END

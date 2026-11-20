@@ -19,6 +19,7 @@
 #include "lkwidgets/widget/llabel.h"
 #include "lkwidgets/core/lgridlayout.h"
 #include "lkgui/image/ltexture.h"
+#include "lkgui/rhi/lrhi.h"
 #include "lkwidgets/widget/lbutton.h"
 #include "lkwidgets/widget/llineedit.h"
 #include "lkwidgets/util/leditbase.h"
@@ -49,7 +50,7 @@
 #include "lkgraph/svg/lsvgrenderer.h"
 
 
-#include "lkaudio/lsound.h"
+#include "lkmedia/lsound.h"
 #include "lksql/lipersist.h"
 #include "edeviceuser.h"
 
@@ -214,6 +215,26 @@ class LTestMainWindow : public LMainWindow
 
 protected:
     virtual void initSpecific() override{
+        // TEMP: 验证 LRhi 门面 + D3D12 后端
+        {
+            auto rhi = LRhi::create(LRhi::D3D);
+            if (rhi != nullptr) {
+                lWarn() << "[rhi] backend:" << rhi->backendName()
+                        << "yUpNDC:" << int(rhi->isYUpInNDC())
+                        << "depth01:" << int(rhi->isClipDepthZeroToOne())
+                        << "ubufAlign:" << rhi->ubufAlignment();
+                auto buf = rhi->newBuffer(LRhiBuffer::Static, LRhiBufferUsage::Vertex, 4096);
+                lWarn() << "[rhi] buffer:" << int(buf != nullptr && buf->create());
+                auto tex = rhi->newTexture(LRhiTexture::RGBA8, LSize<int>(64, 64));
+                lWarn() << "[rhi] texture:" << int(tex != nullptr && tex->create());
+                auto sampler = rhi->newSampler(LRhiSampler::Linear, LRhiSampler::Linear,
+                                               LRhiSampler::Linear, LRhiSampler::ClampToEdge,
+                                               LRhiSampler::ClampToEdge, LRhiSampler::ClampToEdge);
+                lWarn() << "[rhi] sampler:" << int(sampler != nullptr && sampler->create());
+            } else {
+                lWarn() << "[rhi] create D3D11 failed";
+            }
+        }
         std::shared_ptr<LTexture> icon = std::make_shared<LTexture>(":/resfile/logo.png");
         setBaseSize(800, 500);
         setWindowIcon(icon);
@@ -979,9 +1000,6 @@ public:
     }
 
 };
-
-
-
 
 int main(int argc, char* argv[]) {
 

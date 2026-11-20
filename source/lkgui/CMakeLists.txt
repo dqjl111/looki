@@ -27,7 +27,14 @@ if(WIN32)
     if(looki_BUILD_3D)
         list(APPEND looki_GUIDIRS
             /lkgui/rhi
-            /lkgui/rhi/d3d
+        )
+
+        list(APPEND LKGUI_SOURCES
+            ${looki_SOURCE_DIR}/lkgui/rhi/d3d/lrhid3d11.h
+            ${looki_SOURCE_DIR}/lkgui/rhi/d3d/lrhid3d11.cpp
+            ${looki_SOURCE_DIR}/lkgui/rhi/d3d/lrhid3d12.h
+            ${looki_SOURCE_DIR}/lkgui/rhi/d3d/lrhid3d12.cpp
+            ${looki_SOURCE_DIR}/lkgui/rhi/d3d/D3D12MemAlloc.cpp
         )
     endif()
 elseif(UNIX)
@@ -51,4 +58,9 @@ endforeach()
 target_include_directories(lkgui PRIVATE ${looki_SOURCE_DIR})
 target_sources(lkgui PRIVATE ${LKGUI_SOURCES} ${LKGUI_HEADERS})
 target_link_libraries(lkgui lkcore ${looki_DEPEND_LIBRARIES})
+
+if(WIN32 AND looki_BUILD_3D)
+    # D3D12 后端需要的系统库
+    target_link_libraries(lkgui d3d12 dxgi dcomp d3dcompiler)
+endif()
 

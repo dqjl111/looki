@@ -7,7 +7,7 @@
 LK_NAMESPACE_BEGIN
 class LSoundData;
 class LAudioListener;
-class LKAUDIODEF LSound
+class LKMEDIADEF LSound
 {
 public:
     enum class Type

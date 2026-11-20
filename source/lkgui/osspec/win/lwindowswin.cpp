@@ -1241,6 +1241,11 @@ HWND LWindowsWin::handle() const
     return m_data.hwnd;
 }
 
+WId LWindowsWin::winId() const
+{
+    return WId(reinterpret_cast<uintptr_t>(m_data.hwnd));
+}
+
 bool LWindowsWin::isTopLevel() const
 {
     const HWND parent = parentHwnd();

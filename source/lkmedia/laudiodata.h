@@ -7,11 +7,11 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #endif
-#include "lkaudio/3rd/miniaudio.h"
+#include "lkmedia/3rd/miniaudio.h"
 
 LK_NAMESPACE_BEGIN
 
-class LAudioEngineData : public LIVar
+class LKMEDIADEF LAudioEngineData : public LIVar
 {
 public:
     LAudioEngineData(const int listenerCount = MA_ENGINE_MAX_LISTENERS);
@@ -28,6 +28,9 @@ public:
     int maxListenerCount();
 
     static std::shared_ptr<LAudioEngineData> engineData(uint8_t type);
+    // 只查已存在的 engine，不会新建。lkmedia 的 ducking 用它避免
+    // 「视频一播放就凭空打开音频设备」这种副作用。
+    static std::shared_ptr<LAudioEngineData> existingEngineData(uint8_t type);
     static void setEngineData(uint8_t type, std::shared_ptr<LAudioEngineData> d);
 private:
     ma_engine m_engine;
@@ -35,7 +38,7 @@ private:
     static std::array<std::shared_ptr<LAudioEngineData>, 2> m_engines;
 };
 
-class LSoundData : public LIVar
+class LKMEDIADEF LSoundData : public LIVar
 {
 public:
     LSoundData(const std::filesystem::path& filePath,

@@ -139,6 +139,7 @@ public:
     virtual void setGeometry(const LRect<int> &rect) override;
     virtual const LRect<int>& geometry() const override { return m_data.geometry; }
     virtual LRect<int> normalGeometry() const override;
+    virtual WId winId() const override;
 
     virtual void setWindowFlags(LFlags<LWindowType> flags) override;
     virtual void setWindowStates(LFlags<LWindowState> state) override;

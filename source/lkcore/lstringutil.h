@@ -37,10 +37,11 @@ public:
     inline static const std::string whiteSpace = "\r\n \t";
     inline static const std::wstring wWhiteSpace = L"\r\n \t";
 
+    static std::wstring localToWide(const std::string& localStr);
     static std::wstring utf8ToWide(const std::string& utf8Str);
     static std::string wideToUtf8(const std::wstring& wideStr);
 
-    static std::string convertEncode(const std::string& in, const std::string& fromCharset="utf8", const std::string& toCharset="gbk");
+    static std::string convertEncode(const std::string& in, const std::string& fromCharset="utf-8", const std::string& toCharset="gbk");
 
     static std::vector<std::wstring> splitToVec(const std::wstring& str, const std::wstring& delimStr, bool skipEmpty = false);
     static std::vector<std::string> splitToVec(const std::string& str, const std::string& delimStr, bool skipEmpty = false);

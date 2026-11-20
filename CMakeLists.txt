@@ -20,6 +20,46 @@ option(looki_BUILD_3D "build lk 3D" OFF)
 option(looki_USE_SSL "build with ssl" OFF)
 option(looki_USE_SQLITE "build with sqlite" OFF)
 
+# lkmedia 是音频(LSound/miniaudio) + 视频(LVideoWidget/LVideoPlayer) 的单一库，
+# 由 looki_BUILD_SHARED 决定编成静态库还是 DLL。
+option(looki_BUILD_VIDEO "build the video part of lkmedia (LVideoWidget + backend)" ON)
+option(looki_VIDEO_AUDIO_DUCKING "duck lkmedia's miniaudio master volume while a video plays" ON)
+
+# lkmedia 的视频后端：静态编译期选择，不生成插件。
+# Windows 默认 Media Foundation；其它平台默认 Null（保证可编译，播放返回失败）。
+# 日后接 Linux：写好 lvideobackendgstreamer.cpp/.h，把这里设为 GStreamer 即可。
+if(WIN32)
+    set(looki_VIDEO_BACKEND "MF" CACHE STRING "lkmedia backend: MF or Null")
+else()
+    set(looki_VIDEO_BACKEND "Null" CACHE STRING "lkmedia backend: Null or GStreamer")
+endif()
+set_property(CACHE looki_VIDEO_BACKEND PROPERTY STRINGS MF GStreamer Null)
+
+set(LOOKI_BUILD_VIDEO 0)
+set(LOOKI_VIDEO_BACKEND_MF 0)
+set(LOOKI_VIDEO_BACKEND_GSTREAMER 0)
+set(LOOKI_VIDEO_BACKEND_NULL 0)
+set(LOOKI_VIDEO_AUDIO_DUCKING 0)
+
+if(looki_BUILD_VIDEO)
+    set(LOOKI_BUILD_VIDEO 1)
+    if(looki_VIDEO_AUDIO_DUCKING)
+        set(LOOKI_VIDEO_AUDIO_DUCKING 1)
+    endif()
+    if(looki_VIDEO_BACKEND STREQUAL "MF")
+        if(NOT WIN32)
+            message(FATAL_ERROR "looki_VIDEO_BACKEND=MF is only available on Windows")
+        endif()
+        set(LOOKI_VIDEO_BACKEND_MF 1)
+    elseif(looki_VIDEO_BACKEND STREQUAL "GStreamer")
+        set(LOOKI_VIDEO_BACKEND_GSTREAMER 1)
+    elseif(looki_VIDEO_BACKEND STREQUAL "Null")
+        set(LOOKI_VIDEO_BACKEND_NULL 1)
+    else()
+        message(FATAL_ERROR "Unknown looki_VIDEO_BACKEND=${looki_VIDEO_BACKEND}; use MF, GStreamer or Null")
+    endif()
+endif()
+
 
 set(looki_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
 if(WIN32)
@@ -45,6 +85,7 @@ endIf()
 
 set(looki_DEPEND_LIBRARIES "")
 set(looki_SSL_LIBRARIES "")
+set(looki_VIDEO_LIBRARIES "")
 
 if(looki_USE_SSL)
   find_package(OpenSSL REQUIRED)
@@ -81,6 +122,11 @@ if(WIN32)
     #link_directories(${looki_SOURCE_DIR}/lk3rd/libs-msvc/x86/)
   set(WINENTRY WIN32)
   list(APPEND looki_DEPEND_LIBRARIES imm32 dwmapi d3d11 d3dcompiler dxgi d2d1 dwrite)
+  if(LOOKI_VIDEO_BACKEND_MF)
+    # mfplat/mfuuid: Media Foundation + GUID 符号；ole32: CoCreateInstance；
+    # oleaut32: SysAllocString (IMFMediaEngine::SetSource 需要 BSTR)。
+    list(APPEND looki_VIDEO_LIBRARIES mfplat mfuuid ole32 oleaut32)
+  endif()
 endif()
 
 

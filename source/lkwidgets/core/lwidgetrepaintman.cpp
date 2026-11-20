@@ -750,7 +750,7 @@ void LWidgetRepaintMan::markNeedsFlush(std::shared_ptr<LWidget> widget,
     auto it = std::find_if(m_needsFlushWidgets.begin(),
                            m_needsFlushWidgets.end(),
                            [widget](std::weak_ptr<LWidget> w) { return w.lock() == widget; });
-    if (it == m_staticWidgets.end())
+    if (it == m_needsFlushWidgets.end())
     {
         m_needsFlushWidgets.push_back(widget);
     }

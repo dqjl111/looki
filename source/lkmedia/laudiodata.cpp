@@ -1,7 +1,7 @@
 #include "laudiodata.h"
 #include "lkcore/ldebug.h"
 #include <algorithm>
-#include "lkaudio/lsound.h"
+#include "lkmedia/lsound.h"
 
 LK_NAMESPACE_BEGIN
 
@@ -40,6 +40,14 @@ std::shared_ptr<LAudioEngineData> LAudioEngineData::engineData(uint8_t type)
         if(m_engines[type] == nullptr){
             m_engines[type] = std::make_shared<LAudioEngineData>();
         }
+        return m_engines[type];
+    }
+    return nullptr;
+}
+
+std::shared_ptr<LAudioEngineData> LAudioEngineData::existingEngineData(uint8_t type)
+{
+    if(type < m_engines.size()){
         return m_engines[type];
     }
     return nullptr;

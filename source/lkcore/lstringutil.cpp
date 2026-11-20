@@ -349,6 +349,65 @@ LStringUtil::LStringUtil()
 
 }
 
+std::wstring LStringUtil::localToWide(const std::string &localStr)
+{
+    if (localStr.empty())
+    {
+        // Empty input --> return empty output string
+        return std::wstring{};
+    }
+#ifdef WIN32
+    // Safely fail if an invalid UTF-8 character sequence is encountered
+    constexpr DWORD kFlags = MB_ERR_INVALID_CHARS;
+
+    const int localLength = (int)localStr.length();
+    UINT ACP = GetACP();
+    // Get the size of the destination UTF-16 string
+    const int wideLength = ::MultiByteToWideChar(
+        ACP,       // source string is in UTF-8
+        kFlags,        // conversion flags
+        localStr.data(),   // source UTF-8 string pointer
+        localLength,    // length of the source UTF-8 string, in chars
+        nullptr,       // unused - no conversion done in this step
+        0              // request size of destination buffer, in wchar_ts
+        );
+    if (wideLength == 0)
+    {
+        lWarn() << "Can't get result UTF-16 string length (MultiByteToWideChar failed):" << ::GetLastError();
+        return std::wstring();
+    }
+
+    // Make room in the destination string for the converted bits
+    std::wstring wideStr(wideLength, L' ');
+    wchar_t* utf16Buffer = wideStr.data();
+    _ASSERTE(utf16Buffer != nullptr);
+
+    // Do the actual conversion from UTF-8 to UTF-16
+    int result = ::MultiByteToWideChar(
+        ACP,       // source string is in UTF-8
+        kFlags,        // conversion flags
+        localStr.data(),   // source UTF-8 string pointer
+        localLength,    // length of source UTF-8 string, in chars
+        utf16Buffer,   // pointer to destination buffer
+        wideLength    // size of destination buffer, in wchar_ts
+        );
+    if (result == 0)
+    {
+        lWarn() << "Can't convert from UTF-8 to wstring (MultiByteToWideChar failed):" << ::GetLastError();
+        return std::wstring();
+    }
+
+    return wideStr;
+#else
+    (fromCharset.empty() || (compareIgnoreCase(LLoger::defaultLogEncode, "utf-8") == 0)){
+        return utf8ToWide(localStr);
+    }else{
+        std::string s = convertEncode(localStr, LLoger::defaultLogEncode, "utf-8");
+        return utf8ToWide(s);
+    }
+#endif
+}
+
 std::wstring LStringUtil::utf8ToWide(const std::string &utf8)
 {
     // Special case of empty input string
@@ -504,8 +563,8 @@ std::string LStringUtil::wideToUtf8(const std::wstring &wideStr)
 #if _WIN32
 std::string LStringUtil::convertEncode(const std::string &in, const std::string &fromCharset, const std::string &toCharset)
 {
-    unsigned inCodePage = (fromCharset.empty() || fromCharset=="utf-8") ? CP_UTF8 : CP_ACP;
-    unsigned outCodePage= (toCharset.empty() || toCharset=="utf-8") ? CP_UTF8 : CP_ACP;
+    unsigned inCodePage = (fromCharset.empty() || (compareIgnoreCase(LLoger::defaultLogEncode, "utf-8") == 0)) ? CP_UTF8 : CP_ACP;
+    unsigned outCodePage= (toCharset.empty() || (compareIgnoreCase(LLoger::defaultLogEncode, "utf-8") == 0)) ? CP_UTF8 : CP_ACP;
     if(inCodePage == outCodePage){
         return in;
     }

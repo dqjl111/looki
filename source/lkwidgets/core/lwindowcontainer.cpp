@@ -21,8 +21,8 @@ static void lwindowcontainerTraverse(std::shared_ptr<LWidget> parent, lwindowcon
 LWindowContainer::LWindowContainer(std::shared_ptr<LWindow> embeddedWindow,
                                    std::shared_ptr<LWidget> parent,
                                    LFlags<LWindowType> f)
+    : LWidget(parent, f)
 {
-
     if (embeddedWindow == nullptr) {
         lWarn() << "LWindowContainer: embedded window cannot be null";
         return;
@@ -252,7 +252,7 @@ void LWindowContainer::updateUsesNativeWidgets()
             return;
         }
         bool nativeWidgetSet = false;
-        std::shared_ptr<LWidget> p = p->parentT<LWidget>();
+        std::shared_ptr<LWidget> p = parentT<LWidget>();
         while (p != nullptr) {
             std::shared_ptr<LAbstractScrollArea> s = std::dynamic_pointer_cast<LAbstractScrollArea>(p);
             if (s != nullptr) {

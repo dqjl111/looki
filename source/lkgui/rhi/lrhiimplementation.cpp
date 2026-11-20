@@ -1,6 +1,7 @@
 ﻿#include "lrhiimplementation.h"
 #include "lrhiplatform.h"
 #ifdef WIN32
+#include "lkgui/rhi/d3d/lrhid3d11.h"
 #include "lkgui/rhi/d3d/lrhid3d12.h"
 #endif
 
@@ -18,14 +19,20 @@ std::shared_ptr<LRhiImplementation> LRhiImplementation::newInstance(LRhi::Implem
     std::shared_ptr<LRhiImplementation> d = nullptr;
 
     switch (impl) {
-    case LRhi::D3D:{
 #ifdef WIN32
+    case LRhi::D3D:{
         std::shared_ptr<LRhiD3D12InitParams> d3dParams = std::dynamic_pointer_cast<LRhiD3D12InitParams>(params);
         std::shared_ptr<LRhiD3D12NativeHandles> d3dDev = std::dynamic_pointer_cast<LRhiD3D12NativeHandles>(importDevice);
-        d = makeInit<LRhiD3d12>(d3dParams, d3dDev);
+        d = makeInit<LRhiD3D12>(d3dParams, d3dDev);
         break;
-#endif
     }
+    case LRhi::D3D11:{
+        std::shared_ptr<LRhiD3D11InitParams> d3dParams = std::dynamic_pointer_cast<LRhiD3D11InitParams>(params);
+        std::shared_ptr<LRhiD3D11NativeHandles> d3dDev = std::dynamic_pointer_cast<LRhiD3D11NativeHandles>(importDevice);
+        d = makeInit<LRhiD3d11>(d3dParams, d3dDev);
+        break;
+    }
+#endif
     default:{
         break;
     }

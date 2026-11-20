@@ -273,6 +273,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::sampledTexture(int binding,
     b.stage = stage;
     b.type = SampledTexture;
 
+    b.data.emplace<TextureAndOrSamplerData>();
     TextureAndOrSamplerData& d = std::get<TextureAndOrSamplerData>(b.data);
     d.count = 1;
     d.texSamplers[0] = { tex, sampler };
@@ -287,6 +288,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::sampledTextures(int binding
     b.stage = stage;
     b.type = SampledTexture;
 
+    b.data.emplace<TextureAndOrSamplerData>();
     TextureAndOrSamplerData& d = std::get<TextureAndOrSamplerData>(b.data);
     d.count = count;
     for (int i = 0; i < count; ++i) {
@@ -306,6 +308,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::texture(int binding, StageF
     b.stage = stage;
     b.type = Texture;
 
+    b.data.emplace<TextureAndOrSamplerData>();
     TextureAndOrSamplerData& d = std::get<TextureAndOrSamplerData>(b.data);
     d.count = 1;
     d.texSamplers[0] = { tex, nullptr };
@@ -320,6 +323,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::textures(int binding, Stage
     b.stage = stage;
     b.type = SampledTexture;
 
+    b.data.emplace<TextureAndOrSamplerData>();
     TextureAndOrSamplerData& d = std::get<TextureAndOrSamplerData>(b.data);
     d.count = count;
     for (int i = 0; i < count; ++i) {
@@ -339,6 +343,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::sampler(int binding, StageF
     b.stage = stage;
     b.type = Sampler;
 
+    b.data.emplace<TextureAndOrSamplerData>();
     TextureAndOrSamplerData& d = std::get<TextureAndOrSamplerData>(b.data);
     d.count = 1;
     d.texSamplers[0] = { nullptr, sampler };
@@ -352,6 +357,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::imageLoad(int binding, Stag
     b.stage = stage;
     b.type = ImageLoad;
 
+    b.data.emplace<StorageImageData>();
     StorageImageData& d = std::get<StorageImageData>(b.data);
     d.tex = tex;
     d.level = level;
@@ -365,6 +371,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::imageStore(int binding, Sta
     b.stage = stage;
     b.type = ImageStore;
 
+    b.data.emplace<StorageImageData>();
     StorageImageData& d = std::get<StorageImageData>(b.data);
     d.tex = tex;
     d.level = level;
@@ -378,6 +385,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::imageLoadStore(int binding,
     b.stage = stage;
     b.type = ImageLoadStore;
 
+    b.data.emplace<StorageImageData>();
     StorageImageData& d = std::get<StorageImageData>(b.data);
     d.tex = tex;
     d.level = level;
@@ -391,6 +399,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferLoad(int binding, Sta
     b.stage = stage;
     b.type = BufferLoad;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = 0;
@@ -405,6 +414,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferLoad(int binding, Sta
     b.stage = stage;
     b.type = BufferLoad;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = offset;
@@ -419,6 +429,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferStore(int binding, St
     b.stage = stage;
     b.type = BufferStore;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = 0;
@@ -433,6 +444,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferStore(int binding, St
     b.stage = stage;
     b.type = BufferStore;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = offset;
@@ -447,6 +459,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferLoadStore(int binding
     b.stage = stage;
     b.type = BufferLoadStore;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = 0;
@@ -461,6 +474,7 @@ LRhiShaderResourceBinding LRhiShaderResourceBinding::bufferLoadStore(int binding
     b.stage = stage;
     b.type = BufferLoadStore;
 
+    b.data.emplace<StorageBufferData>();
     StorageBufferData& d = std::get<StorageBufferData>(b.data);
     d.buf = buf;
     d.offset = offset;
@@ -477,6 +491,19 @@ LRhiShaderResourceBindings::LRhiShaderResourceBindings(std::shared_ptr<LRhiImple
     m_layoutDesc.reserve(s);
 }
 
+
+void LRhiShaderResourceBindings::setSampledTexture(int binding, std::shared_ptr<LRhiTexture> tex,
+                                                   std::shared_ptr<LRhiSampler> sampler)
+{
+    for (LRhiShaderResourceBinding &b : m_bindings) {
+        if (b.binding == binding && b.type == LRhiShaderResourceBinding::SampledTexture) {
+            std::get<LRhiShaderResourceBinding::TextureAndOrSamplerData>(b.data).texSamplers[0] = { tex, sampler };
+            return;
+        }
+    }
+    m_bindings.push_back(LRhiShaderResourceBinding::sampledTexture(
+                binding, LRhiShaderResourceBindingStage::Fragment, tex, sampler));
+}
 
 LRhiResource::Type LRhiShaderResourceBindings::resourceType() const
 {
@@ -495,6 +522,67 @@ bool LRhiShaderResourceBindings::isLayoutCompatible(const std::shared_ptr<LRhiSh
 
     return m_layoutDescHash == other->m_layoutDescHash
            && m_layoutDesc == other->m_layoutDesc;
+}
+
+std::vector<LRhiShaderResourceBindings::BindingInfo> LRhiShaderResourceBindings::bindingInfos() const
+{
+    std::vector<BindingInfo> out;
+    out.reserve(m_bindings.size());
+    for (const LRhiShaderResourceBinding &b : m_bindings) {
+        BindingInfo info;
+        info.binding = b.binding;
+        info.type = int(b.type);
+        info.stage = int(b.stage);
+        switch (b.type) {
+        case LRhiShaderResourceBinding::UniformBuffer: {
+            if (const auto *d = std::get_if<LRhiShaderResourceBinding::UniformBufferData>(&b.data)) {
+                info.buffer = d->buf;
+                info.offset = d->offset;
+            }
+            break;
+        }
+        case LRhiShaderResourceBinding::SampledTexture:
+        case LRhiShaderResourceBinding::Texture: {
+            if (const auto *d = std::get_if<LRhiShaderResourceBinding::TextureAndOrSamplerData>(&b.data)) {
+                info.arraySize = d->count;
+                for (int i = 0; i < d->count; ++i) {
+                    info.textureSamplers.push_back(d->texSamplers[i]);
+                }
+            }
+            break;
+        }
+        case LRhiShaderResourceBinding::Sampler: {
+            if (const auto *d = std::get_if<LRhiShaderResourceBinding::TextureAndOrSamplerData>(&b.data)) {
+                if (d->count > 0) {
+                    info.sampler = d->texSamplers[0].sampler;
+                }
+            }
+            break;
+        }
+        case LRhiShaderResourceBinding::ImageLoad:
+        case LRhiShaderResourceBinding::ImageStore:
+        case LRhiShaderResourceBinding::ImageLoadStore: {
+            if (const auto *d = std::get_if<LRhiShaderResourceBinding::StorageImageData>(&b.data)) {
+                info.textureSamplers.push_back({ d->tex, nullptr });
+                info.frameLevel = d->level;
+            }
+            break;
+        }
+        case LRhiShaderResourceBinding::BufferLoad:
+        case LRhiShaderResourceBinding::BufferStore:
+        case LRhiShaderResourceBinding::BufferLoadStore: {
+            if (const auto *d = std::get_if<LRhiShaderResourceBinding::StorageBufferData>(&b.data)) {
+                info.buffer = d->buf;
+                info.offset = d->offset;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        out.push_back(std::move(info));
+    }
+    return out;
 }
 
 
@@ -869,6 +957,8 @@ std::string LRhi::backendName(Implementation impl)
         return "Metal";
     case D3D:
         return "D3D12";
+    case D3D11:
+        return "D3D11";
     default:{
         return "";
     }
@@ -881,6 +971,209 @@ LRhiDriverInfo LRhi::driverInfo() const
         return m_impl->driverInfo();
     }
     return LRhiDriverInfo();
+}
+
+// ---------------------------------------------------------------------------
+// LRhi 门面：后面这些基本都是把调用转给当前后端
+// ---------------------------------------------------------------------------
+std::shared_ptr<LRhiResourceUpdateBatch> LRhi::newResourceUpdateBatch()
+{
+    return m_impl != nullptr ? std::shared_ptr<LRhiResourceUpdateBatch>(new LRhiResourceUpdateBatch(m_impl)) : nullptr;
+}
+
+std::shared_ptr<LRhiGraphicsPipeline> LRhi::newGraphicsPipeline()
+{
+    return m_impl != nullptr ? m_impl->createGraphicsPipeline() : nullptr;
+}
+
+std::shared_ptr<LRhiComputePipeline> LRhi::newComputePipeline()
+{
+    return m_impl != nullptr ? m_impl->createComputePipeline() : nullptr;
+}
+
+std::shared_ptr<LRhiShaderResourceBindings> LRhi::newShaderResourceBindings()
+{
+    return m_impl != nullptr ? m_impl->createShaderResourceBindings() : nullptr;
+}
+
+std::shared_ptr<LRhiBuffer> LRhi::newBuffer(LRhiBuffer::Type type,
+                                            LRhiBuffer::UsageFlags usage,
+                                            uint32_t size)
+{
+    return m_impl != nullptr ? m_impl->createBuffer(type, usage, size) : nullptr;
+}
+
+std::shared_ptr<LRhiRenderBuffer> LRhi::newRenderBuffer(LRhiRenderBuffer::Type type,
+                                                        const LSize<int> &pixelSize,
+                                                        int sampleCount,
+                                                        bool usedWithSwapChainOnly,
+                                                        LRhiTexture::Format backingFormatHint)
+{
+    return m_impl != nullptr
+            ? m_impl->createRenderBuffer(type, pixelSize, sampleCount,
+                                         usedWithSwapChainOnly, backingFormatHint)
+            : nullptr;
+}
+
+std::shared_ptr<LRhiTexture> LRhi::newTexture(LRhiTexture::Format format,
+                                              const LSize<int> &pixelSize,
+                                              int depth, int arraySize, int sampleCount,
+                                              LRhiTexture::Flags flags)
+{
+    return m_impl != nullptr
+            ? m_impl->createTexture(format, pixelSize, depth, arraySize, sampleCount, flags)
+            : nullptr;
+}
+
+std::shared_ptr<LRhiSampler> LRhi::newSampler(LRhiSampler::Filter magFilter,
+                                              LRhiSampler::Filter minFilter,
+                                              LRhiSampler::Filter mipmapMode,
+                                              LRhiSampler::AddressMode u,
+                                              LRhiSampler::AddressMode v,
+                                              LRhiSampler::AddressMode w)
+{
+    return m_impl != nullptr
+            ? m_impl->createSampler(magFilter, minFilter, mipmapMode, u, v, w)
+            : nullptr;
+}
+
+std::shared_ptr<LRhiTextureRenderTarget> LRhi::newTextureRenderTarget(
+        const LRhiTextureRenderTargetDescription &desc,
+        LRhiTextureRenderTarget::Flags flags)
+{
+    return m_impl != nullptr ? m_impl->createTextureRenderTarget(desc, flags) : nullptr;
+}
+
+std::shared_ptr<LRhiShadingRateMap> LRhi::newShadingRateMap()
+{
+    return m_impl != nullptr ? m_impl->createShadingRateMap() : nullptr;
+}
+
+std::shared_ptr<LRhiSwapChain> LRhi::newSwapChain()
+{
+    return m_impl != nullptr ? m_impl->createSwapChain() : nullptr;
+}
+
+LRhi::FrameOpResult LRhi::beginFrame(std::shared_ptr<LRhiSwapChain> swapChain,
+                                     BeginFrameFlags flags)
+{
+    if(m_impl == nullptr){
+        return FrameOpError;
+    }
+    return m_impl->beginFrame(swapChain, flags);
+}
+
+LRhi::FrameOpResult LRhi::endFrame(std::shared_ptr<LRhiSwapChain> swapChain,
+                                   EndFrameFlags flags)
+{
+    if(m_impl == nullptr){
+        return FrameOpError;
+    }
+    return m_impl->endFrame(swapChain, flags);
+}
+
+LRhi::FrameOpResult LRhi::beginOffscreenFrame(std::shared_ptr<LRhiCommandBuffer> *cb,
+                                              BeginFrameFlags flags)
+{
+    if(m_impl == nullptr){
+        return FrameOpError;
+    }
+    return m_impl->beginOffscreenFrame(cb, flags);
+}
+
+LRhi::FrameOpResult LRhi::endOffscreenFrame(EndFrameFlags flags)
+{
+    return m_impl != nullptr ? m_impl->endOffscreenFrame(flags) : FrameOpError;
+}
+
+LRhi::FrameOpResult LRhi::finish()
+{
+    return m_impl != nullptr ? m_impl->finish() : FrameOpError;
+}
+
+std::list<int> LRhi::supportedSampleCounts() const
+{
+    return m_impl != nullptr ? m_impl->supportedSampleCounts() : std::list<int>{1};
+}
+
+int LRhi::ubufAlignment() const
+{
+    return m_impl != nullptr ? m_impl->ubufAlignment() : 256;
+}
+
+bool LRhi::isYUpInFramebuffer() const
+{
+    return m_impl != nullptr ? m_impl->isYUpInFramebuffer() : false;
+}
+
+bool LRhi::isYUpInNDC() const
+{
+    return m_impl != nullptr ? m_impl->isYUpInNDC() : false;
+}
+
+bool LRhi::isClipDepthZeroToOne() const
+{
+    return m_impl != nullptr ? m_impl->isClipDepthZeroToOne() : false;
+}
+
+LMatrix4x4 LRhi::clipSpaceCorrMatrix() const
+{
+    return m_impl != nullptr ? m_impl->clipSpaceCorrMatrix() : LMatrix4x4();
+}
+
+bool LRhi::isTextureFormatSupported(LRhiTexture::Format format, LRhiTexture::Flags flags) const
+{
+    return m_impl != nullptr ? m_impl->isTextureFormatSupported(format, flags) : false;
+}
+
+bool LRhi::isFeatureSupported(Feature feature) const
+{
+    return m_impl != nullptr ? m_impl->isFeatureSupported(feature) : false;
+}
+
+int LRhi::resourceLimit(ResourceLimit limit) const
+{
+    return m_impl != nullptr ? m_impl->resourceLimit(limit) : 0;
+}
+
+LRhiStats LRhi::statistics()
+{
+    return m_impl != nullptr ? m_impl->statistics() : LRhiStats();
+}
+
+const std::shared_ptr<LRhiNativeHandles> LRhi::nativeHandles()
+{
+    return m_impl != nullptr ? m_impl->nativeHandles() : nullptr;
+}
+
+const std::shared_ptr<LRhiNativeHandles> LRhi::nativeHandles(std::shared_ptr<LRhiCommandBuffer> cb)
+{
+    return m_impl != nullptr ? m_impl->nativeHandles(cb) : nullptr;
+}
+
+void LRhi::releaseCachedResources()
+{
+    if(m_impl != nullptr){
+        m_impl->releaseCachedResources();
+    }
+}
+
+bool LRhi::isDeviceLost() const
+{
+    return m_impl != nullptr && m_impl->isDeviceLost();
+}
+
+LRhi::Implementation LRhi::probe(Implementation impl,
+                                 std::shared_ptr<LRhiInitParams> params,
+                                 Flags flags)
+{
+    std::shared_ptr<LRhi> rhi = create(impl, params, flags);
+    if (rhi == nullptr) {
+        return Null;
+    }
+    // 能创建就说明该后端在当前环境可用，随即销毁
+    rhi->m_impl->destroy();
+    return impl;
 }
 
 static void changeToDynamicUpdate(std::shared_ptr<LRhiResourceUpdateBatch::BufferOp> op, std::shared_ptr<LRhiBuffer> buf, uint32_t offset, uint32_t size, const void *data)
