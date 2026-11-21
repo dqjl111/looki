@@ -640,7 +640,8 @@ void LVideoWindow::renderThreadMain()
         }
 
         const int fps = std::max(1, m_renderFrameRate.load(std::memory_order_relaxed));
-        const int intervalMs = std::max(1, 1000 / fps);
+        //帧时间间隔是1000/fps，正里快两倍，取500/fps以保证播放看起来流畅
+        const int intervalMs = std::max(1, 500 / fps);
         std::unique_lock<std::mutex> lock(m_waitMutex);
         m_waitCv.wait_for(lock, std::chrono::milliseconds(intervalMs),
                           [this] { return !m_renderRunning.load(std::memory_order_relaxed); });
